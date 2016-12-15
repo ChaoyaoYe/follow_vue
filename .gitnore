@@ -1,0 +1,6 @@
+dist/vue.min.js.gz
+test/vue.test.js
+explorations
+node_modules
+.DS_Store
+benchmarks/borwser.js
