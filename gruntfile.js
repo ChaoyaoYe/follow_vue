@@ -1,5 +1,13 @@
 module.exports = function (grunt) {
 
+  var version = grunt.file.readJSON('package.json').version
+  var banner =
+    '/**\n' +
+    ' * Vue.js v' + version + '\n' +
+    ' * (c) ' + new Date().getFullYear() + ' Evan You\n' +
+    ' * Released under the MIT License.\n' +
+    ' */\n'
+
   grunt.initConfig({
 
     jshint: {
@@ -14,21 +22,21 @@ module.exports = function (grunt) {
         src: 'src/**/*.js'
       },
       test: {
-        src: 'test/*/specs/*.js'
+        src: 'test/**/*.js'
       }
     },
 
     karma: {
       options: {
         frameworks: ['jasmine', 'commonjs'],
-        preprocessors: {
-          'src/*.js': ['commonjs'],
-          'test/unit/**/*': ['commonjs']
-        },
         files: [
-          'src/*.js',
+          'src/**/*.js',
           'test/unit/**/*.js'
         ],
+        preprocessors: {
+          'src/**/*.js': ['commonjs'],
+          'test/unit/**/*.js': ['commonjs']
+        },
         singleRun: true
       },
       browsers: {
@@ -36,49 +44,79 @@ module.exports = function (grunt) {
           browsers: ['Chrome', 'Firefox'],
           reporters: ['progress']
         }
-      }
-    }
-  }),
-
-  browserify: {
-    build: {
-      src: ['src/vue.js'],
-      dest: 'dist/vue.js',
-      options: {
-        bundleOptions {
-          standalone: 'Vue'
+      },
+      phantom: {
+        options: {
+          browsers: ['PhantomJS'],
+          reporters: ['progress']
         }
       }
     },
-    watch: {
-      src: ['src/vue.js'],
-      dest: 'dist/vue.js',
-      options: {
-        watch: true,
-        keepAlive: true,
-        bundleOptions: {
-          standalone: 'Vue'
+
+    browserify: {
+      build: {
+        src: ['src/vue.js'],
+        dest: 'dist/vue.js',
+        options: {
+          bundleOptions: {
+            standalone: 'Vue'
+          },
+          postBundleCB: function (err, src, next) {
+            next(err, banner + src)
+          }
+        }
+      },
+      watch: {
+        src: ['src/vue.js'],
+        dest: 'dist/vue.js',
+        options: {
+          watch: true,
+          keepAlive: true,
+          bundleOptions: {
+            standalone: 'Vue'
+          }
+        }
+      },
+      bench: {
+        src: ['benchmarks/*.js', '!benchmarks/browser.js'],
+        dest: 'benchmarks/browser.js'
+      }
+    },
+
+    uglify: {
+      build: {
+        options: {
+          banner: banner,
+          compress: {
+            pure_funcs: [
+                '_.log',
+                '_.warn',
+                'enableDebug'
+            ]
+          }
+        },
+        files: {
+          'dist/vue.min.js': ['dist/vue.js']
         }
       }
     }
-  },
-  bench: {
-    src: ['benchmarks/*.js', '!benchmarks/browsers.js'],
-    dest: 'benchmarks/browsers.js'
-  }
 
+  })
+
+  // load npm tasks
   grunt.loadNpmTasks('grunt-contrib-jshint')
+  grunt.loadNpmTasks('grunt-contrib-uglify')
   grunt.loadNpmTasks('grunt-karma')
   grunt.loadNpmTasks('grunt-browserify')
 
-  //load custom tasks
+  // load custom tasks
   grunt.file.recurse('tasks', function (path) {
     require('./' + path)(grunt)
   })
 
-  grunt.loadNpmTasks('unit', ['karma:browsers'])
-  grunt.loadNpmTasks('phantom', ['karma:phantom'])
-  grunt.loadNpmTasks('watch', ['browserify:watch'])
-  grunt.loadNpmTasks('build', ['browserify:build'])
+  grunt.registerTask('unit', ['karma:browsers'])
+  grunt.registerTask('phantom', ['karma:phantom'])
+  grunt.registerTask('watch', ['browserify:watch'])
+  grunt.registerTask('build', ['browserify:build', 'uglify:build'])
 
 }

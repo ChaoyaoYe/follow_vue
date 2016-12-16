@@ -18,7 +18,8 @@ __.define(objectAgumentations, '$add', function(key, val){
   var ob = this.$observer
   ob.observe(key, val)
   ob.convert(key, val)
-  ob.propagate('added', key, val)
+  ob.emit('add:self', key, val)
+  ob.propagate('add', key, val)
 })
 
 /**
@@ -33,8 +34,8 @@ __.define(objectAgumentations, '$delete', function (key){
   if(!this.hasOwnProperty(key)) return
   delete this[key]
   var ob = this.$observer
-  ob.emit('deleted:self', key)
-  ob.propagate('deleted', key)
+  ob.emit('delete:self', key)
+  ob.propagate('delete', key)
 })
 
 module.exports = objectAgumentations

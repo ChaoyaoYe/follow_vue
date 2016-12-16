@@ -1,5 +1,4 @@
 var __ = require('../util')
-var slice = [].slice
 var arrayAugmentations = Object.create(Array.prototype)
 
 /**
@@ -21,7 +20,7 @@ var arrayAugmentations = Object.create(Array.prototype)
   //define wrapped method
   __.define(arrayAugmentations, method, function(){
 
-    var args = slice.call(arguments)
+    var args = __.toArray(arguments)
     var result = original.apply(this, args)
     var ob = this.$observer
     var inserted, removed, index

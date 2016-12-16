@@ -1,15 +1,19 @@
 var Observer = require('../observe/observer')
-var scopeEvents = ['set', 'mutate', 'added', 'deleted']
+var scopeEvents = ['set', 'mutate', 'add', 'delete']
 
 /**
- * Setup scope and listen to parent scope changes.
- * Only called once during _init().
+ * Setup instance scope
+ * The scope is reponsible for prototypal inheritance of
+ * parent instance properties abd all binding paths and
+ * expressions of the current instance are evaluated against its scope
+ *
+ * This should only be called once during _init()
  */
 
 exports._initScope = function (options) {
-
-  var parent = this.$parent = options.parent
-  var scope = this.$scope = parent && options._inheritScope !== false
+  var options = this.$options
+  var parent = this.$parent
+  var scope = this.$scope = parent
     ? Object.create(parent.$scope)
     : {}
   // create scope observer
@@ -19,6 +23,21 @@ exports._initScope = function (options) {
   })
 
   if (!parent) return
+
+  // scope parent accessor (allow $parent/$root access on $scope)
+  Object.defineProperty(scope, '$parent', {
+    get: function(){
+      return parent.$scope
+    }
+  })
+
+  //scope root accessor
+  var self = this
+  Object.defineProperty(scope, '$root', {
+    get: function(){
+      return self.$root.$scope
+    }
+  })
 
   // relay change events that sent down from
   // the scope prototype chain.
