@@ -8,7 +8,7 @@ function assertExp (testCase) {
 var testCases = [
   {
     // string concat
-    exp: 'a + b',
+    exp: 'a+b',
     scope: {
       a: 'hello',
       b: 'world'
@@ -94,7 +94,7 @@ var testCases = [
 
 describe('Expression Parser', function () {
 
-  it('parse', function () {
+  it('parse getter', function () {
     testCases.forEach(assertExp)
   })
 
@@ -102,6 +102,16 @@ describe('Expression Parser', function () {
     var fn1 = expParser.parse('a + b')
     var fn2 = expParser.parse('a + b')
     expect(fn1).toBe(fn2)
+  })
+
+  it('parse setter', function(){
+    var setter = expParser.parse('a[b]', true).setter
+    var scope = {
+      a: { c: 1 },
+      b: 'c'
+    }
+    setter(scope, 2)
+    expect(scope.a.c).toBe(2)
   })
 
 })

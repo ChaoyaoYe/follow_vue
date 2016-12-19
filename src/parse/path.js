@@ -1,9 +1,7 @@
-var _ = require('../util')
 var Cache = require('../cache')
 var pathCache = new Cache(1000)
-var identStart = '[$_a-zA-Z]'
-var identPart = '[$_a-zA-Z0-9]'
-var IDENT_RE = new RegExp('^' + identStart + '+' + identPart + '*' + '$')
+var Observer = require('../observe/observer')
+var identRE = /^[$_a-zA-Z]+[\w$]*$/
 
 /**
  * Path-parsing algorithm scooped from Polymer/observe-js
@@ -161,10 +159,7 @@ function parsePath (path) {
     }
   }
 
-  function maybeUnescapeQuote() {
-    if (index >= path.length) {
-      return
-    }
+  function maybeUnescapeQuote () {
     var nextChar = path[index + 1]
     if ((mode === 'inSingleQuote' && nextChar === "'") ||
         (mode === 'inDoubleQuote' && nextChar === '"')) {
@@ -179,7 +174,7 @@ function parsePath (path) {
     index++
     c = path[index]
 
-    if (c === '\\' && maybeUnescapeQuote(mode)) {
+    if (c === '\\' && maybeUnescapeQuote()) {
       continue
     }
 
@@ -200,31 +195,27 @@ function parsePath (path) {
       return keys
     }
   }
-
-  return // parse error
 }
 
-function isIndex(s) {
-  return +s === s >>> 0;
-}
-
-function isIdent(s) {
-  return IDENT_RE.test(s);
-}
+/**
+ * Format a accessor segment based on its type.
+ *
+ * @param {String} key
+ * @return {Boolean}
+ */
 
 function formatAccessor(key) {
-  if (isIdent(key)) {
+  if (identRE.test(key)) { // identifier
     return '.' + key
-  } else if (isIndex(key)) {
+  } else if (+key === key >>> 0) { // bracket index
     return '[' + key + ']';
-  } else {
+  } else { // bracket string
     return '["' + key.replace(/"/g, '\\"') + '"]';
   }
 }
 
 /**
- * Compiles a getter function with a set path, which
- * is much more efficient than the dynamic path getter.
+ * Compiles a getter function with a fixed path.
  *
  * @param {Array} path
  * @return {Function}
@@ -257,9 +248,7 @@ exports.parse = function (path) {
   if (!hit) {
     hit = parsePath(path)
     if (hit) {
-      if (_.hasEval) {
-        hit.get = exports.compileGetter(hit)
-      }
+      hit.get = exports.compileGetter(hit)
       pathCache.put(path, hit)
     }
   }
@@ -267,24 +256,27 @@ exports.parse = function (path) {
 }
 
 /**
- * Get from an object from a path
+ * Get from an object from a path string
  *
  * @param {Object} obj
  * @param {String} path
  */
 
 exports.get = function (obj, path) {
-  if (typeof path === 'string') {
-    path = exports.parse(path)
-  }
-  if (!path) {
-    return
-  }
-  // path has compiled getter
-  if (path.get) {
+  path = exports.parse(path)
+  if (path) {
     return path.get(obj)
   }
-  // else do the traversal
+}
+
+/**
+ * Get from an object from an array
+ *
+ * @param {Object} obj
+ * @param {Array} path
+ */
+
+exports.getFromArray = function (obj, path) {
   for (var i = 0, l = path.length; i < l; i++) {
     if (obj == null) return
     obj = obj[path[i]]
@@ -293,10 +285,28 @@ exports.get = function (obj, path) {
 }
 
 /**
- * Set on an object from a path
+ * Get from an object from an Observer-delimitered path.
+ * e.g. "a\bb\bc"
  *
  * @param {Object} obj
  * @param {String} path
+ */
+
+exports.getFromObserver = function (obj, path) {
+  var hit = pathCache.get(path)
+  if (!hit) {
+    hit = path.split(Observer.pathDelimiter)
+    hit.get = exports.compileGetter(hit)
+    pathCache.put(path, hit)
+  }
+  return hit.get(obj)
+}
+
+/**
+ * Set on an object from a path
+ *
+ * @param {Object} obj
+ * @param {String | Array} path
  * @param {*} val
  */
 
@@ -305,7 +315,7 @@ exports.set = function (obj, path, val) {
     path = exports.parse(path)
   }
   if (!path) {
-    return
+    return false
   }
   for (var i = 0, l = path.length - 1; i < l; i++) {
     if (!obj || typeof obj !== 'object') {

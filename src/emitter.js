@@ -18,7 +18,7 @@ var p = Emitter.prototype
  * @param {Function} fn
  * @param {Emitter}
  */
-
+//every on function contains a array of event handlers
 p.on = function(event, fn){
   this._cbs = this._cbs || {}
   ;(this._cbs[event] = this._cbs[event] || [])
@@ -104,7 +104,7 @@ p.emit = function(event, a, b, c) {
   if(callbacks){
     callbacks = callbacks.slice(0)
     for(var i = 0, len = callbacks.length; i < len; i++){
-      callbacks[i].call(this._ctx, a, b, c)
+      callbacks[i].call(this._ctx, a, b, c) // what emit means is invoking the callback function
     }
   }
 

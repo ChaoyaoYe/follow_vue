@@ -78,12 +78,12 @@ exports._initTemplate = function () {
 
 exports._collectRawContent = function () {
   var el = this.$el
-  var child 
+  var child
   if (el.hasChildNodes()) {
-    this.rawContent = document.createElement('div')
+    this._rawContent = document.createElement('div')
     /* jshint boss: true */
     while (child = el.firstChild) {
-      this.rawContent.appendChild(child)
+      this._rawContent.appendChild(child)
     }
   }
 }
@@ -96,5 +96,66 @@ exports._collectRawContent = function () {
  */
 
 exports._initContent = function () {
-  // TODO
+  var outlets = getOutlets(this.$el)
+  var raw = this._rawContent
+  var i = outlets.length
+  var outlet, select, j, main
+  if(i){
+    //first pass, collect corresponding content
+    //for each outlets
+    while(i--){
+      outlet = outlets[i]
+      if(raw) {
+        select = outlet.getAttribute('select')
+        if(select) { //select content
+          outlet.content = _.toArray(raw.querySelectorAll(select))
+        }else { // default content
+          main = outlet
+        }
+      }else { //fallback content
+        outlet.content = _.toArray(outlet.childNodes)
+      }
+    }
+    //second pass, actually insert the contents
+    for(i = 0, j = outlets.length; i < j; i++) {
+      insertContentAt(outlet, outlet.content)
+    }
+    //finally insert the main content
+    if(raw && main){
+      insertContentAt(main, _.toArray(raw.childNodes))
+    }
+  }
+  this._rawContent = null
+}
+
+/**
+ * Get <content> outlets from the element/list
+ *
+ * @param {Element|Array} el
+ * @param {Array}
+ */
+
+var concat = [].concat
+
+function getOutlets(el) {
+  return _.isArray(el)
+    ? concat.apply([], el.map(getOutlets))
+    : _.toArray(el.getElementByTagName('content'))
+}
+
+/**
+ *  Insert an array of nodes at outlet, then remove the outlet
+ *
+ * @param {Element} outlet
+ * @param {Array} contents
+ */
+
+function insertContentAt (outlet, contents){
+  //not using util DOM methods here because
+  // parentNode can be cached
+  var parent = outlet.parentNode
+  for(var i = 0, j = contents.length; i < j; i++){
+    parent.insertBefore(contents[i], outlet)
+  }
+  parent.removeChild(outlet)
 }

@@ -19,7 +19,8 @@
  * @param {Number} limit
  * @constructor
  */
-
+// attribute size->size of cache, limit->limit of cache, head and tail object
+// of cache, _keymap-> key map of cache xc.2016-2-19.
 function Cache (limit) {
   this.size = 0
   this.limit = limit
@@ -39,21 +40,22 @@ var p = Cache.prototype
  * @param {*} value
  * @return {Entry|undefined}
  */
-
+//put value by the key to the cache
 p.put = function (key, value) {
+  //create the entry to be put
   var entry = {
     key:key,
     value:value
   }
-  this._keymap[key] = entry
-  if (this.tail) {
+  this._keymap[key] = entry // add key to the keymap of cache
+  if (this.tail) {// if the tail entry isn't empty, put new entry to it
     this.tail.newer = entry
     entry.older = this.tail
-  } else {
+  } else {// if the tail entry is empty, let new entry be the head
     this.head = entry
   }
-  this.tail = entry
-  if (this.size === this.limit) {
+  this.tail = entry // reset the tail entry of cache 
+  if (this.size === this.limit) {// judge the size to determine whether to get rid of the old entry.
     return this.shift()
   } else {
     this.size++

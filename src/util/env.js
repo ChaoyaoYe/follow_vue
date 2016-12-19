@@ -7,8 +7,8 @@
  */
 
 var inBrowser = exports.inBrowser =
-  typeof document !== 'undefined' &&
-  Object.prototype.toString.call(document) === '[object HTMLDocument]'
+  typeof window !== 'undefined' &&
+  Object.prototype.toString.call(window) === '[object Object]'
 
 /**
  * Defer a task to the start of the next event loop
@@ -16,41 +16,11 @@ var inBrowser = exports.inBrowser =
  * @param {Function} fn
  */
 
-var defer = inBrowser
+exports.nextTick = inBrowser
   ? (window.requestAnimationFrame ||
     window.webkitRequestAnimationFrame ||
     setTimeout)
   : setTimeout
-
-exports.nextTick = function (fn) {
-  return defer(fn, 0)
-}
-
-/**
- * Detect if the environment allows creating
- * a function from strings.
- *
- * @type {Boolean}
- */
-
-exports.hasEval = (function () {
-  // chrome apps enforces CSP
-  if (typeof chrome !== 'undefined' &&
-      chrome.app &&
-      chrome.app.runtime) {
-    return false
-  }
-  // so does Firefox OS apps...
-  if (inBrowser && navigator.getDeviceStorage) {
-    return false
-  }
-  try {
-    var f = new Function('', 'return true;')
-    return f()
-  } catch (e) {
-    return false
-  }
-})()
 
 /**
  * Detect if we are in IE9...

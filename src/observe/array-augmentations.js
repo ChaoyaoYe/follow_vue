@@ -1,4 +1,4 @@
-var __ = require('../util')
+var _ = require('../util')
 var arrayAugmentations = Object.create(Array.prototype)
 
 /**
@@ -18,9 +18,9 @@ var arrayAugmentations = Object.create(Array.prototype)
   //cache original method
   var original = Array.prototype[mehod]
   //define wrapped method
-  __.define(arrayAugmentations, method, function(){
+  _.define(arrayAugmentations, method, function(){
 
-    var args = __.toArray(arguments)
+    var args = _.toArray(arguments)
     var result = original.apply(this, args)
     var ob = this.$observer
     var inserted, removed, index
@@ -86,7 +86,7 @@ var arrayAugmentations = Object.create(Array.prototype)
  * @return {*} - replaced element
  */
 
-__.define(arrayAugmentations， '$set', function(index, val){
+_.define(arrayAugmentations， '$set', function(index, val){
   if(index >= this.length) {
     this.length = index + 1
   }
@@ -100,7 +100,7 @@ __.define(arrayAugmentations， '$set', function(index, val){
  * @param  {*} val
  */
 
-__.define(arrayAugmentations, '$remove', function(index){
+_.define(arrayAugmentations, '$remove', function(index){
   if(typeof index !== 'number'){
     index = this.indexOf(index)
   }

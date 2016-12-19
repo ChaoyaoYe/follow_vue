@@ -1,4 +1,18 @@
 /**
+ * Simple bind, faster than native
+ *
+ * @param {Function} fn
+ * @param {Object} ctx
+ */
+
+exports.bind = function (fn, ctx) {
+  return function () {
+    // bind actually return the function execute the function pass in to certain ctx
+    return fn.apply(ctx, arguments)
+  }
+}
+
+/**
  * Convert an Array-like object to a real Array.
  *
  * @param {Array-like} list
@@ -17,8 +31,8 @@ exports.toArray = function (list, i) {
  * @param {Object} to
  * @param {Object} from
  */
-
-exports.mixin = function (to, from) {
+//copy properties to target object.
+exports.extend = function (to, from) {
   for (var key in from) {
     to[key] = from[key]
   }
@@ -45,7 +59,7 @@ exports.deepMixin = function (to, from) {
  * @param {Object} from
  * @param {String} key
  */
-
+// copy certain property to target object combine the accessor
 exports.proxy = function (to, from, key) {
   if (to.hasOwnProperty(key)) return
   Object.defineProperty(to, key, {
@@ -91,7 +105,7 @@ exports.isArray = function (obj) {
  * @param {*} val
  * @param {Boolean} [enumerable]
  */
-
+// add a non-enumerable(unchangable) property to obj
 exports.define = function (obj, key, val, enumerable) {
   Object.defineProperty(obj, key, {
     value        : val,

@@ -1,3 +1,4 @@
+var Emitter = require('../emitter')
 var mergeOptions = require('../util').mergeOptions
 
 /**
@@ -15,10 +16,20 @@ exports._init = function (options) {
   options = options || {}
 
   this.$el          = null
-  this.$parent      = options.parent
+  this._data        = options.data || {}
   this._isBlock     = false
   this._isDestroyed = false
   this._rawContent  = null
+  this._emitter     = new Emitter(this)
+  // the current target directive for dependency collection
+  this._targetDir = null
+
+  // setup parent relationship
+  this.$parent = options.parent
+  this._children = []
+  if (this.$parent) {
+    this.$parent._children.push(this)
+  }
 
   // merge options.
   this.$options = mergeOptions(
@@ -27,16 +38,28 @@ exports._init = function (options) {
     this
   )
 
+  // the `created` hook is called after basic properties have
+  // been set up & before data observation happens.
+  this._callHook('created')
+
+  // setup event system and option events
+  this._initEvents()
+
   // create scope.
   // @creates this.$scope
   this._initScope()
 
   // setup initial data.
-  // @creates this._data
-  this._initData(options.data || {}, true)
+  this._initData(this._data, true)
 
   // setup property proxying
   this._initProxy()
+
+  // setup computed properties
+  this._initComputed()
+
+  // Setup instance methods
+  this._initMethods()
 
   // setup binding tree.
   // @creates this._rootBinding

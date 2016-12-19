@@ -1,4 +1,5 @@
-//alias debug as _ so we can drop _.warn during uglification
+// alias debug as _ so we can drop _.warn during uglification
+var _ = require('./debug')
 var extend = require('./lang').extend
 
 /**
@@ -21,8 +22,7 @@ var strats = {}
 
 strats.created =
 strats.ready =
-strats.attached =
-strats.detached =
+strats.beforeMount =
 strats.beforeDestroy =
 strats.afterDestroy =
 strats.paramAttributes = function (parentVal, childVal) {
@@ -44,11 +44,31 @@ strats.effects =
 strats.components = function (parentVal, childVal, key, vm) {
   var ret = Object.create(
     vm && vm.$parent
-    ? vm.$parent.$options[key]
-    : null
+      ? vm.$parent.$options[key]
+      : null
   )
   extend(ret, parentVal)
   extend(ret, childVal)
+  return ret
+}
+
+/**
+ * Events
+ *
+ * Events should not overwrite one another, so we merge
+ * them as arrays.
+ */
+
+strats.events = function (parentVal, childVal) {
+  var ret = Object.create(null)
+  extend(ret, parentVal)
+  for (var key in childVal) {
+    var parent = ret[key]
+    var child = childVal[key]
+    ret[key] = parent
+      ? parent.concat(child)
+      : [child]
+  }
   return ret
 }
 
@@ -58,8 +78,7 @@ strats.components = function (parentVal, childVal, key, vm) {
  */
 
 strats.methods =
-strats.computed =
-strats.events = function(parentVal, childVal){
+strats.computed = function (parentVal, childVal) {
   var ret = Object.create(null)
   extend(ret, parentVal)
   extend(ret, childVal)
@@ -67,7 +86,12 @@ strats.events = function(parentVal, childVal){
 }
 
 /**
- * Default strategy
+ * Default strategy.
+ * Applies to:
+ * - data
+ * - el
+ * - parent
+ * - replace
  */
 
 var defaultStrat = function (parentVal, childVal) {

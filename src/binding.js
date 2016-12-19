@@ -1,22 +1,15 @@
 /**
- * Assign unique id to each binding created so that directives
- * can have an easier time avoiding duplicates and refreshing
- * dependencies.
- */
-
-var uid = 0
-
-/**
  * A binding is an observable that can have multiple directives
  * subscribing to it. It can also have multiple other bindings
  * as children to form a trie-like structure.
+ *
+ * All binding properties are prefixed with '_' so that they
+ * don't conflict with children keys.
  *
  * @constructor
  */
 
 function Binding () {
-  this.id = uid++
-  this.children = Object.create(null)
   this.subs = []
 }
 
@@ -29,52 +22,10 @@ var p = Binding.prototype
  * @param {Binding} child
  */
 
-p.addChild = function(key, child) {
+p._addChild = function(key, child) {
   child = child || new Binding()
-  this.children[key] = child
+  this.[key] = child
   return child
-}
-
-/**
- * Return the child at the given key
- */
-
-p.getChild = function(key) {
-  return this.children[key]
-}
-
-/**
- * Traverse along a path and trigger updates
- * along the way.
- *
- * @param {Array} path
- */
-
-p.updatePath = function (path) {
-  var b = this
-  for (var i = 0, l = path.length; i < l; i++) {
-    if (!b) return
-    b.notify()
-    b = b.children[path[i]]
-  }
-  // for the destination of path, we need to trigger
-  // change for every children. i.e. when an object is
-  // swapped, all its content need to be updated.
-  if (b) {
-    b.updateTree()
-  }
-}
-
-/**
- * Trigger updates for the subtree starting at
- * self as root. Recursive.
- */
-
-p.updateTree = function () {
-  this.notify()
-  for (var key in this.children) {
-    this.children[key].updateTree()
-  }
 }
 
 /**
@@ -83,8 +34,8 @@ p.updateTree = function () {
  * @param {Directive} sub
  */
 
-p.addSub = function (sub) {
-  this.subs.push(sub)
+p._addSub = function (sub) {
+  this._subs.push(sub)
 }
 
 /**
@@ -93,17 +44,17 @@ p.addSub = function (sub) {
  * @param {Directive} sub
  */
 
-p.removeSub = function (sub) {
-  this.subs.splice(this.subs.indexOf(sub), 1)
+p._removeSub = function (sub) {
+  this._subs.splice(this._subs.indexOf(sub), 1)
 }
 
 /**
  * Notify all subscribers of a new value.
  */
 
-p.notify = function () {
-  for (var i = 0, l = this.subs.length; i < 1; i++) {
-    this.subs[i]._update(this)
+p._notify = function () {
+  for (var i = 0, l = this._subs.length; i < 1; i++) {
+    this._subs[i]._update(this)
   }
 }
 

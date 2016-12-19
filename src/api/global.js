@@ -31,7 +31,7 @@ exports.nextTick   = _.nextTick
 exports.transition = require('../transition/transition')
 
 /**
- * Class inehritance
+ * Class inheritance
  *
  * @param {Object} extendOptions
  */
@@ -50,6 +50,7 @@ exports.extend = function (extendOptions) {
   // create asset registers, so extended classes
   // can have their private assets too.
   createAssetRegisters(Sub)
+  return Sub
 }
 
 /**
@@ -67,7 +68,7 @@ exports.use = function (plugin) {
     }
   }
   // additional parameters
-  var args = __.toArray(arguments, 1)
+  var args = _.toArray(arguments, 1)
   args.unshift(this)
   if (typeof plugin.install === 'function') {
     plugin.install.apply(plugin, args)

@@ -1,10 +1,20 @@
-var _ = require('../../src/util')
-var config = require('../../src/config')
+var _ = require('../../../src/util')
+var config = require('../../../src/config')
 config.silent = true
 
 describe('Util', function () {
 
   describe('Language Enhancement', function () {
+
+    it('bind', function () {
+      var original = function (a) {
+        return this.a + a
+      }
+      var ctx = { a: 'ctx a ' }
+      var bound = _.bind(original, ctx)
+      var res = bound('arg a')
+      expect(res).toBe('ctx a arg a')
+    })
 
     it('toArray', function () {
       // should make a copy of original array
@@ -153,6 +163,14 @@ describe('Util', function () {
         expect(child.nextSibling).toBe(target)
       })
 
+      it('after with sibling', function () {
+        var sibling = div()
+        parent.appendChild(sibling)
+        _.after(target, child)
+        expect(target.parentNode).toBe(parent)
+        expect(child.nextSibling).toBe(target)
+      })
+
       it('remove', function () {
         _.remove(child)
         expect(child.parentNode).toBeNull()
@@ -160,6 +178,13 @@ describe('Util', function () {
       })
 
       it('prepend', function () {
+        _.prepend(target, parent)
+        expect(target.parentNode).toBe(parent)
+        expect(parent.firstChild).toBe(target)
+      })
+
+      it('prepend to empty node', function () {
+        parent.removeChild(child)
         _.prepend(target, parent)
         expect(target.parentNode).toBe(parent)
         expect(parent.firstChild).toBe(target)
@@ -173,9 +198,56 @@ describe('Util', function () {
         expect(target.getAttribute('test1')).toBe('1')
         expect(target.getAttribute('test2')).toBe('2')
       })
-
     })
+  }
 
+  if (typeof console !== undefined) {
+
+    describe('Debug', function () {
+
+      beforeEach(function () {
+        spyOn(console, 'log')
+        spyOn(console, 'warn')
+        if (console.trace) {
+          spyOn(console, 'trace')
+        }
+      })
+
+      it('log when debug is true', function () {
+        config.debug = true
+        _.log('hello', 'world')
+        expect(console.log).toHaveBeenCalledWith('hello', 'world')
+      })
+
+      it('not log when debug is false', function () {
+        config.debug = false
+        _.log('bye', 'world')
+        expect(console.log.callCount).toBe(0)
+      })
+
+      it('warn when silent is false', function () {
+        config.silent = false
+        _.warn('oops', 'ops')
+        expect(console.warn).toHaveBeenCalledWith('oops', 'ops')
+      })
+
+      it('not warn when silent is ture', function () {
+        config.silent = true
+        _.warn('oops', 'ops')
+        expect(console.warn.callCount).toBe(0)
+      })
+
+      if (console.trace) {
+        it('trace when not silent and debugging', function () {
+          config.debug = true
+          config.silent = false
+          _.warn('haha')
+          expect(console.trace).toHaveBeenCalled()
+          config.debug = false
+          config.silent = true
+        })
+      }
+    })
   }
 
   describe('Option merging', function () {
@@ -213,19 +285,52 @@ describe('Util', function () {
       expect(res[1]).toBe(fn2)
     })
 
-    it('object hashes', function () {
+    it('events', function () {
+
+      var fn1 = function () {}
+      var fn2 = function () {}
+      var fn3 = function () {}
+      var parent = {
+        events: {
+          'fn1': [fn1, fn2],
+          'fn2': [fn2]
+        }
+      }
+      var child = {
+        events: {
+          'fn1': fn3,
+          'fn3': fn3
+        }
+      }
+      var res = merge(parent, child).events
+      assertRes(res.fn1, [fn1, fn2, fn3])
+      assertRes(res.fn2, [fn2])
+      assertRes(res.fn3, [fn3])
+
+      function assertRes (res, expected) {
+        expect(Array.isArray(res)).toBe(true)
+        expect(res.length).toBe(expected.length)
+        var i = expected.length
+        while (i--) {
+          expect(res[i]).toBe(expected[i])
+        }
+      }
+
+    })
+
+    it('normal object hashes', function () {
       var fn1 = function () {}
       var fn2 = function () {}
       var res
       // parent undefined
-      res = merge({}, {events: {test: fn1}}).events
+      res = merge({}, {methods: {test: fn1}}).methods
       expect(res.test).toBe(fn1)
       // child undefined
-      res = merge({events: {test: fn1}}, {}).events
+      res = merge({methods: {test: fn1}}, {}).methods
       expect(res.test).toBe(fn1)
       // both defined
-      var parent = {events: {test: fn1}}
-      res = merge(parent, {events: {test2: fn2}}).events
+      var parent = {methods: {test: fn1}}
+      res = merge(parent, {methods: {test2: fn2}}).methods
       expect(res.test).toBe(fn1)
       expect(res.test2).toBe(fn2)
     })

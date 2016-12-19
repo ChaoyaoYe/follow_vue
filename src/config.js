@@ -23,7 +23,7 @@ module.exports = {
   silent: false,
 
   /**
-   * Whether to parse mustache tags in templates.
+   * Whether to parse mustache {{}} tags in templates.
    * @type {Boolean}
    */
   interpolate : true

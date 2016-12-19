@@ -20,6 +20,8 @@ map.colgroup =
 map.caption =
 map.tfoot = [1, '<table>', '</table>']
 
+map.g =
+map.defs =
 map.text =
 map.circle =
 map.ellipse =
@@ -90,12 +92,12 @@ function nodeToFragment (node) {
   var tag = node.tagName
   // if its a template tag and the browser supports it,
   // its content is already a document fragment.
-  if (tag === 'TEMPLATE' && node.content) {
+  if (tag === 'TEMPLATE' && node.content instanceof DocumentFragment) {
     return node.content
   }
   return tag === 'SCRIPT'
     ? stringToFragment(node.textContent)
-    : stringToFragment(node.outerHTML)
+    : stringToFragment(node.innerHTML)
 }
 
 /**
@@ -116,7 +118,7 @@ exports.parse = function (template) {
   var node, frag
 
   // if the template is already a document fragment -- do nothing
-  if (template instanceof window.DocumentFragment) {
+  if (template instanceof DocumentFragment) {
     return template
   }
 
