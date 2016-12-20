@@ -47,7 +47,6 @@ item._observer.on('set', function (key, val) {
 })
 
 // TODO turn these into tests
-
 console.log(vm.a) // 'parent a'
 console.log(child.a) // 'child a'
 console.log(child.b) // 'parent b'
