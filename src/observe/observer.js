@@ -90,7 +90,10 @@ Observer.create = function (value, options) {
     return value.$observer
   } if (_.isArray(value)) {
     return new Observer(value, ARRAY, options)
-  } else if (_.isObject(value) && !value._scope) { // avoid Vue instance
+  } else if (
+    _.isObject(value) &&
+    !value.$scope
+  ) { // avoid Vue instance
     return new Observer(value, OBJECT, options)
   }
 }
@@ -107,7 +110,10 @@ p.walk = function (obj) {
   var key, val, descriptor, prefix
   for (key in obj) {
     prefix = key.charAt(0)
-    if (prefix === '$' || prefix === '_') {
+    if (
+      prefix === 0x24 || // $
+      prefix === 0x5F    // _
+    ) {
       continue
     }
     descriptor = Object.getOwnPropertyDescriptor(obj, key)
@@ -230,6 +236,7 @@ p.propagate = function (event, path, val, mutation) {
   if (!this.parents) return
   for (var id in this.parents) {
     var parent = this.parents[id]
+    if (!parent) continue
     var key = parent.key
     var parentPath = path
       ? key + Observer.pathDelimiter + path

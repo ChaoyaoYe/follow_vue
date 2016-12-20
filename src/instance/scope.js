@@ -12,22 +12,22 @@ var scopeEvents = ['set', 'mutate', 'add', 'delete']
  */
 
 exports._initScope = function () {
-  var parent = this.$parent
-  var scope = this.$scope = parent
+  var inherit = parent && this.$options.inheritScope
+  var scope = this.$scope = inherit
     ? Object.create(parent.$scope)
     : {}
   // create scope observer
-  this._observer = Observer.create(scope, {
+  this.$observer = Observer.create(scope, {
     callbackContext: this,
     doNotAlterProto: true
   })
 
-  if (!parent) return
+  if (!inherit) return
 
   // relay change events that sent down from
   // the scope prototype chain.
-  var ob = this._observer
-  var pob = parent._observer
+  var ob = this.$observer
+  var pob = parent.$observer
   var listeners = this._scopeListeners = {}
   scopeEvents.forEach(function (event) {
     var cb = listeners[event] = function (key, a, b) {
@@ -43,18 +43,22 @@ exports._initScope = function () {
 }
 
 /**
- * Teardown scope and remove listeners attached to parent scope.
+ * Teardown scope, unsync data, and remove all listeners
+ * including ones attached to parent's observer.
  * Only called once during $destroy().
  */
 
 exports._teardownScope = function () {
+  this.$observer.off()
+  this._unsyncData()
   this.$scope = null
-  if (!this.$parent) return
-  var pob = this.$parent._observer
-  var listeners = this._scopeListeners
-  scopeEvents.forEach(function (event) {
-    pob.off(event, listeners[event])
-  })
+  if (!this.$parent) {
+    var pob = this.$parent.$observer
+    var listeners = this._scopeListeners
+    scopeEvents.forEach(function (event) {
+      pob.off(event, listeners[event])
+    })
+  }
 }
 
 /**
@@ -82,10 +86,14 @@ exports._initData = function (data, init) {
 
   if (!init) {
     // teardown old sync listeners
-    this._teardownData()
+    this._unsync()
     // delete keys not present in the new data
     for (key in scope) {
-      if (scope.hasOwnProperty(key) && !(key in data)) {
+      if (
+        key.charCodeAt(0) !== 0x24 && //$
+        scope.hasOwnProperty(key) &&
+        !(key in data)
+       ) {
         scope.$delete(key)
       }
     }
@@ -102,21 +110,9 @@ exports._initData = function (data, init) {
     }
   }
 
-  // setup sync between scope and new data
-  if (this.$options.syncData) {
-    this._dataObserver = Observer.create(data)
-    this._sync()
-  }
-}
-
-/**
- * Stop data-syncing.
- */
-
-exports._teardownData = function () {
-  if (this.$options.syncData) {
-    this._unsync()
-  }
+  this._data = data
+  this._dataObserver = Observer.create(data)
+  this._syncData()
 }
 
 /**
@@ -146,7 +142,7 @@ exports._initProxy = function () {
     }
   }
   // keep proxying up-to-date with added/deleted keys.
-  this._observer
+  this.$observer
     .on('add:self', function (key) {
       _.proxy(this, scope, key)
     })
@@ -159,6 +155,7 @@ exports._initProxy = function () {
   // proxy vm parent & root on scope
   _.proxy(scope, this, '$parent')
   _.proxy(scope, this, '$root')
+  _.proxy(scope, this, '$data')
 }
 
 /**
@@ -213,7 +210,7 @@ exports._initMethods = function () {
  * the original data. Requires teardown.
  */
 
-exports._sync = function () {
+exports._syncData = function () {
   var data = this._data
   var scope = this.$scope
   var locked = false
@@ -244,7 +241,7 @@ exports._sync = function () {
   }
 
   // sync scope and original data.
-  this._observer
+  this.$observer
     .on('set:self', listeners.data.set)
     .on('add:self', listeners.data.add)
     .on('delete:self', listeners.data.delete)
@@ -256,12 +253,22 @@ exports._sync = function () {
 
   /**
    * The guard function prevents infinite loop
-   * when syncing between two observers.
+   * when syncing between two observers. Also
+   * filters out properties prefixed with $ or _.
+   *
+   * @param {Function} fn
+   * @return {Function}
    */
 
   function guard (fn) {
     return function (key, val) {
-      if (locked) return
+      if (locked) {
+        return
+      }
+      var c = key.charCodeAt(0)
+      if(c === 0x24 || c === 0x5F){ // $ and _
+        return
+      }
       locked = true
       fn(key, val)
       locked = false
@@ -273,10 +280,10 @@ exports._sync = function () {
  * Teardown the sync between scope and previous data object.
  */
 
-exports._unsync = function () {
+exports._unsyncData = function () {
   var listeners = this._syncListeners
 
-  this._observer
+  this.$observer
     .off('set:self', listeners.data.set)
     .off('add:self', listeners.data.add)
     .off('delete:self', listeners.data.delete)

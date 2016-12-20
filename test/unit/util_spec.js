@@ -16,6 +16,13 @@ describe('Util', function () {
       expect(res).toBe('ctx a arg a')
     })
 
+    it('attr', function () {
+      target.setAttribute('v-test', 'ok')
+      var val = _.attr(target, 'test')
+      expect(val).toBe('ok')
+      expect(target.hasAttribute('v-test')).toBe(false)
+    })
+
     it('toArray', function () {
       // should make a copy of original array
       var arr = [1,2,3]
@@ -134,6 +141,76 @@ describe('Util', function () {
 
   })
 
+  describe('Filter', function () {
+
+    var debug = require('../../../src/util/debug')
+    beforeEach(function () {
+      spyOn(debug, 'warn')
+    })
+
+    it('resolveFilters', function () {
+      var filters = [
+        { name: 'a', args: ['a'] },
+        { name: 'b', args: ['b']},
+        { name: 'c' }
+      ]
+      var vm = {
+        $options: {
+          filters: {
+            a: function (v, arg) {
+              return { id: 'a', value: v, arg: arg }
+            },
+            b: {
+              read: function (v, arg) {
+                return { id: 'b', value: v, arg: arg }
+              },
+              write: function (v, oldVal, arg) {
+                return { id: 'bw', value: v, arg: arg }
+              }
+            }
+          }
+        }
+      }
+      var target = {
+        value: 'v'
+      }
+      var res = _.resolveFilters(vm, filters, target)
+      expect(res.read.length).toBe(2)
+      expect(res.write.length).toBe(1)
+
+      var readA = res.read[0](1)
+      expect(readA.id).toBe('a')
+      expect(readA.value).toBe(1)
+      expect(readA.arg).toBe('a')
+
+      var readB = res.read[1](2)
+      expect(readB.id).toBe('b')
+      expect(readB.value).toBe(2)
+      expect(readB.arg).toBe('b')
+
+      var writeB = res.write[0](3)
+      expect(writeB.id).toBe('bw')
+      expect(writeB.value).toBe(3)
+      expect(writeB.arg).toBe('b')
+
+      expect(debug.warn).toHaveBeenCalled()
+    })
+
+    it('applyFilters', function () {
+      var filters = [
+        function (v) {
+          return v + 2
+        },
+        function (v) {
+          return v + 3
+        }
+      ]
+      var res = _.applyFilters(1, filters)
+      expect(res).toBe(6)
+    })
+
+  })
+
   if (_.inBrowser) {
 
     describe('DOM', function () {
@@ -201,7 +278,7 @@ describe('Util', function () {
     })
   }
 
-  if (typeof console !== undefined) {
+  if (typeof console !== 'undefined') {
 
     describe('Debug', function () {
 
@@ -222,7 +299,7 @@ describe('Util', function () {
       it('not log when debug is false', function () {
         config.debug = false
         _.log('bye', 'world')
-        expect(console.log.callCount).toBe(0)
+        expect(console.log.calls.count()).toBe(0)
       })
 
       it('warn when silent is false', function () {
@@ -234,7 +311,7 @@ describe('Util', function () {
       it('not warn when silent is ture', function () {
         config.silent = true
         _.warn('oops', 'ops')
-        expect(console.warn.callCount).toBe(0)
+        expect(console.warn.calls.count()).toBe(0)
       })
 
       if (console.trace) {

@@ -12,18 +12,23 @@ var templateParser = require('../parse/template')
 
 exports._initElement = function (el) {
   if (typeof el === 'string') {
+    var selector = el
     el = document.querySelector(el)
+    if(!el){
+      _.warn('Cannot find element: ' + selector)
+    }
   }
   // If the passed in `el` is a DocumentFragment, the instance is
   // considered a "block instance" which manages not a single element,
   // but multiple elements. A block instance's `$el` is an Array of
   // the elements it manages.
-  if (el instanceof window.DocumentFragment) {
-    this._isBlock = true
-    this.$el = _.toArray(el.childNodes)
+  if (el instanceof DocumentFragment) {
+    this._blockNodes = _.toArray(el.childNodes)
+    this.$el = document.createElement('vue-block')
   } else {
     this.$el = el
   }
+  this.$el.__vue__ = this
   this._initTemplate()
   this._initContent()
 }
@@ -38,21 +43,20 @@ exports._initTemplate = function () {
   var options = this.$options
   var template = options.template
   if (template) {
-    var frag = templateParser.parse(template)
+    var frag = templateParser.parse(template, true)
     if (!frag) {
       _.warn('Invalid template option: ' + template)
     } else {
       // collect raw content. this wipes out the container el.
       this._collectRawContent()
-      frag = frag.cloneNode(true)
       if (options.replace) {
         // replace
         if (frag.childNodes.length > 1) {
           // the template contains multiple nodes
           // in this case the original `el` is simply
           // a placeholder.
-          this._isBlock = true
-          this.$el = _.toArray(frag.childNodes)
+          this._blockNodes = _.toArray(frag.childNodes)
+          this.$el = document.createComment('vue-block')
         } else {
           // 1 to 1 replace, we need to copy all the
           // attributes from the original el to the replacer
@@ -108,7 +112,9 @@ exports._initContent = function () {
       if(raw) {
         select = outlet.getAttribute('select')
         if(select) { //select content
-          outlet.content = _.toArray(raw.querySelectorAll(select))
+          outlet.content = _.toArray(
+            raw.querySelectorAll(select)
+          )
         }else { // default content
           main = outlet
         }

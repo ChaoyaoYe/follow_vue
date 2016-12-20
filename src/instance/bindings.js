@@ -30,7 +30,7 @@ exports._initBindings = function () {
     root._addChild('$root', this.$root._rootBinding)
   }
   // setup observer events
-  this._observer
+  this.$observer
     // simple updates
     .on('set', this._updateBindingAt)
     .on('mutate', this._updateBindingAt)
@@ -81,6 +81,8 @@ exports._createBindingAt = function (path) {
  */
 
 exports._updateBindingAt = function (path) {
+  // root binding updates on any change
+  this._rootBinding._notify()
   var binding = this._getBindingAt(path, true)
   if (binding) {
     binding._notify()
@@ -110,10 +112,10 @@ exports._updateAdd = function (path) {
  */
 
 exports._collectDep = function (path) {
-  var directive = this._targetDir
-  // the get event might have come from a child vm's directive
-  // so this._targetDir is not guarunteed to be defined
-  if (directive) {
-    directive._addDep(path)
+  var watcher = this._activeWather
+  // the get event might have come from a child vm's watcher
+  // so this._activeWather is not guarunteed to be defined
+  if (watcher) {
+    watcher.addDep(path)
   }
 }

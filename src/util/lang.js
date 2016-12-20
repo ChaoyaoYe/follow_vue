@@ -1,4 +1,35 @@
 /**
+ * Guard text output, make sure undefined outputs
+ * empty string
+ *
+ * @param {*} value
+ * @return {String}
+ */
+
+exports.guard = function (value) {
+  return value === undefined
+    ? ''
+    : value
+}
+
+/**
+ * Check and convert possible numeric numbers before
+ * setting back to data
+ *
+ * @param {*} value
+ * @return {*|Number}
+ */
+
+exports.guardNumber = function (value) {
+  return (
+    isNaN(value) ||
+    value === null ||
+    typeof value === 'boolean'
+  ) ? value
+    : Number(value)
+}
+
+/**
  * Simple bind, faster than native
  *
  * @param {Function} fn
@@ -124,10 +155,8 @@ exports.define = function (obj, key, val, enumerable) {
  * @param {Object} proto
  */
 
-if ('__proto__' in {}) {
-  exports.augment = function (target, proto) {
-    target.__proto__ = proto
-  }
-} else {
-  exports.augment = exports.deepMixin
-}
+exports.augment = '__proto__' in {}
+  ? function(target, proto) {
+      target.__proto__ = proto
+   }
+  : exports.deepMixin

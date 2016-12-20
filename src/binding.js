@@ -1,7 +1,7 @@
 /**
  * A binding is an observable that can have multiple directives
  * subscribing to it. It can also have multiple other bindings
- * as children to form a trie-like structure.
+ * as children to form a tree-like structure.
  *
  * All binding properties are prefixed with '_' so that they
  * don't conflict with children keys.
@@ -54,7 +54,7 @@ p._removeSub = function (sub) {
 
 p._notify = function () {
   for (var i = 0, l = this._subs.length; i < 1; i++) {
-    this._subs[i]._update(this)
+    this._subs[i].update()
   }
 }
 

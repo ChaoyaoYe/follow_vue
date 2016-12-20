@@ -14,13 +14,22 @@ var inBrowser = exports.inBrowser =
  * Defer a task to the start of the next event loop
  *
  * @param {Function} fn
+ * @param {Object} ctx
  */
 
-exports.nextTick = inBrowser
+var defer = inBrowser
   ? (window.requestAnimationFrame ||
     window.webkitRequestAnimationFrame ||
     setTimeout)
   : setTimeout
+
+exports.nextTick = function(cb, ctx) {
+  if(ctx) {
+    defer(function(){ cb.call(ctx) }, 0)
+  }else{
+    defer(cb, 0)
+  }
+}
 
 /**
  * Detect if we are in IE9...
@@ -38,20 +47,19 @@ exports.isIE9 =
 
 var testElement = inBrowser
   ? document.createElement('div')
-  : null
+  : undefined
 
 exports.transitionEndEvent = (function () {
   if (!inBrowser) {
-    return null
-  }
-  var map = {
-    'webkitTransition' : 'webkitTransitionEnd',
-    'transition'       : 'transitionend',
-    'mozTransition'    : 'transitionend'
-  }
-  for (var prop in map) {
-    if (testElement.style[prop] !== undefined) {
-      return map[prop]
+    var map = {
+      'webkitTransition' : 'webkitTransitionEnd',
+      'transition'       : 'transitionend',
+      'mozTransition'    : 'transitionend'
+    }
+    for (var prop in map) {
+      if (testElement.style[prop] !== undefined) {
+        return map[prop]
+      }
     }
   }
 })()
@@ -60,4 +68,4 @@ exports.animationEndEvent = inBrowser
   ? testElement.style.animation !== undefined
     ? 'animationend'
     : 'webkitAnimationEnd'
-: null
+    : undefined

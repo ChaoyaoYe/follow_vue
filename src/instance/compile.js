@@ -1,4 +1,9 @@
+var _ = require('../util')
 var config = require('../config')
+var Direcitve = require('../directive')
+var textParser = require('../parse/text')
+var dirParser = require('../parse/directive')
+var templateParser = require('../parse/template')
 
 /**
  * The main entrance to the compilation process.
@@ -8,8 +13,8 @@ var config = require('../config')
  */
 
 exports._compile = function () {
-  if (this._isBlock) {
-    this.$el.forEach(this._compileNode, this)
+  if (this._blockNodes) {
+    this._blockNodes.forEach(this._compileNode, this)
   } else {
     this._compileNode(this.$el)
   }
@@ -41,13 +46,86 @@ exports._compileNode = function (node) {
 }
 
 /**
- * Compile an HTMLElement
+ * Compile an Element
  *
- * @param {HTMLElement} node
+ * @param {Element} node
  */
 
 exports._compileElement = function (node) {
+  var tag = node.tagName
+  // textarea is pretty annoying
+  // because its value creates childNodes which
+  // we don't want to compile.
+  if (tag === 'TEXTAREA' && node.value) {
+      node.value = this.$interpolate(node.value)
+  }
+  var hasAttributes = node.hasAttributes()
+  // check priority directives
+  if (hasAttributes) {
+    if (this._checkPriorityDirectives(node)) {
+      return
+    }
+  }
+  // check tag components
+  if (
+    tag.indexOf('-') > 0 &&
+    this.$options.components[tag]
+  ) {
+    this._bindDirective('component', tag, node)
+    return
+  }
+  // compile normal directives
+  if (hasAttributes) {
+    this._compileAttrs(node)
+  }
+  // recursively compile childNodes
+  if (node.hasChildNodes()) {
+    _.toArray(node.childNodes)
+      .forEach(this._compileNode, this)
+  }
+}
 
+/**
+ * Compile attribtues on an Element
+ *
+ * @param {Element} node
+ */
+
+exports._compileAttrs = function (node) {
+  var attrs = _.toArray(node.attributes)
+  var i = attrs.length
+  var registry = this.$options.directives
+  var dirs = []
+  var attr, attrName, dir, dirName
+  while (i--) {
+    attr = attrs[i]
+    attrName = attr.name
+    if (attrName.indexOf(config.prefix) === 0) {
+      dirName = attrName.slice(config.prefix.length)
+      if (registry[dirName]) {
+        node.removeAttribute(attrName)
+        dirs.push({
+          name: dirName,
+          value: attr.value
+        })
+      } else {
+        _.warn('Failed to resolve directive: ' + dirName)
+      }
+    } else if (config.interpolate) {
+      this._bindAttr(node, attr)
+    }
+  }
+  // sort the directives by priority, low to high
+  dirs.sort(function (a, b) {
+    a = registry[a.name].priority || 0
+    b = registry[b.name].priority || 0
+    return a > b ? 1 : -1
+  })
+  i = dirs.length
+  while (i--) {
+    dir = dirs[i]
+    this._bindDirective(dir.name, dir.value, node)
+  }
 }
 
 /**
@@ -57,7 +135,38 @@ exports._compileElement = function (node) {
  */
 
 exports._compileTextNode = function (node) {
-
+  var tokens = textParser.parse(node.nodeValue)
+  if (!tokens) {
+    return
+  }
+  var el, token, value
+  for (var i = 0, l = tokens.length; i < l; i++) {
+    token = tokens[i]
+    if (token.tag) {
+      if (token.oneTime) {
+        value = this.$get(token.value)
+        el = token.html
+          ? templateParser.parse(value, true)
+          : document.createTextNode(value)
+        _.before(el, node)
+      } else {
+        value = token.value
+        if (token.html) {
+          el = document.createComment('vue-html')
+          _.before(el, node)
+          this._bindDirective('html', value, el)
+        } else {
+          el = document.createTextNode('')
+          _.before(el, node)
+          this._bindDirective('text', value, el)
+        }
+      }
+    } else {
+      el = document.createTextNode(token.value)
+      _.before(el, node)
+    }
+  }
+  _.remove(node)
 }
 
 /**
@@ -68,4 +177,94 @@ exports._compileTextNode = function (node) {
 
 exports._compileComment = function (node) {
 
+}
+
+/**
+ * Check an attribute for potential bindings
+ */
+
+exports._bindAttr = function (node, attr) {
+  var tokens = textParser.parse(attr.value)
+  if (!tokens) {
+    return
+  }
+  if(tokens.length > 1){
+    _.warn(
+      'Invalid attribute binding: "' + attr.value + '"' +
+      '\nUse one single interpolation tag in ' +
+      'attribute bindings.'
+    )
+    return
+  }
+  //wrap namespace attribute so it won't mess up
+  // the directive parser
+  var arg = attr.name.indexOf(':') > 0
+    ? "'" + attr.name + "'"
+    : attr.name
+  this._bindDirective(
+    'attr',
+    arg + ':' + tokens[0].value,
+    node
+  )
+}
+
+/**
+ * Helper to translate token value into expression parts.
+ *
+ * @param {Object} token
+ * @return {String}
+ */
+
+function expifyToken (token) {
+  return token.tag
+    ? token.value
+    : ("'" + token.value + "'")
+}
+
+/**
+ * Check for priority directives that would potentially
+ * skip other directives:
+ *
+ * - v-pre
+ * - v-repeat
+ * - v-if
+ * - v-component
+ *
+ * @param {Element} node
+ * @return {Boolean}
+ */
+
+exports._checkPriorityDirectives = function (node) {
+  var value
+  /* jshint boss: true */
+  if (_.attr(node, 'pre') !== null) {
+    return true
+  } else if (value = _.attr(node, 'repeat')) {
+    this._bindDirective('repeat', value)
+    return true
+  } else if (value = _.attr(node, 'if')) {
+    this._bindDirective('if', value)
+    return true
+  } else if (value = _.attr(node, 'component')) {
+    this._bindDirective('component', value)
+    return true
+  }
+}
+
+/**
+ * Bind a directive.
+ *
+ * @param {String} name
+ * @param {String} value
+ * @param {Element} node
+ */
+
+exports._bindDirective = function (name, value, node) {
+  var descriptors = dirParser.parse(value)
+  var dirs = this._directives
+  for (var i = 0, l = descriptors.length; i < l; i++) {
+    dirs.push(
+      new Direcitve(name, node, this, descriptors[i])
+    )
+  }
 }

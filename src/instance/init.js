@@ -17,12 +17,13 @@ exports._init = function (options) {
 
   this.$el          = null
   this._data        = options.data || {}
-  this._isBlock     = false
+  this._blockNodes  = null
   this._isDestroyed = false
   this._rawContent  = null
   this._emitter     = new Emitter(this)
-  // the current target directive for dependency collection
-  this._targetDir = null
+  this._watchers    = {}
+  this._activeWatcher = null
+  this._directives  = []
 
   // setup parent relationship
   this.$parent = options.parent
@@ -42,9 +43,6 @@ exports._init = function (options) {
   // been set up & before data observation happens.
   this._callHook('created')
 
-  // setup event system and option events
-  this._initEvents()
-
   // create scope.
   // @creates this.$scope
   this._initScope()
@@ -58,12 +56,15 @@ exports._init = function (options) {
   // setup computed properties
   this._initComputed()
 
-  // Setup instance methods
+  // setup instance methods
   this._initMethods()
 
   // setup binding tree.
   // @creates this._rootBinding
   this._initBindings()
+
+  // setup event system and option events
+  this._initEvents()
 
   // if `el` option is passed, start compilation.
   if (options.el) {

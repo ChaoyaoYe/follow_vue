@@ -210,6 +210,7 @@ function checkSetter (hit) {
  */
 
 exports.parse = function (exp, needSet) {
+  exp = exp.trim()
   // try cache
   var hit = expressionCache.get(exp)
   if (hit) {
@@ -218,7 +219,6 @@ exports.parse = function (exp, needSet) {
     }
     return hit
   }
-  exp = exp.trim()
   // we do a simple path check to optimize for that scenario.
   // the check fails valid paths with unusal whitespaces, but
   // that's too rare and we don't care.

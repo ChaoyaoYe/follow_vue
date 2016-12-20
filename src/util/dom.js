@@ -1,3 +1,21 @@
+var config = require('../config')
+
+/**
+ * Extract an attribute from a node.
+ *
+ * @param {Node} node
+ * @param {String} attr
+ */
+
+exports.attr = function(node, attr){
+  attr = config.prefix + attr
+  var val = node.getAttribute(attr)
+  if(val !== null){
+    node.removeAttribute(attr)
+  }
+  return val
+}
+
 /**
  * Insert el before target
  *

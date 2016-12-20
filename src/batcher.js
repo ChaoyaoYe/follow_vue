@@ -1,7 +1,7 @@
 var _ = require('./util')
 
 /**
- * The Batcher maintains a job queue to be executed
+ * The Batcher maintains a job queue to be run
  * async on the next event loop.
  */
 
@@ -21,7 +21,7 @@ var p = Batcher.prototype
  *   properties:
  *   - {String|Number} id
  *   - {Boolean}       override
- *   - {Function}      execute
+ *   - {Function}      run
  */
 
 p.push = function (job) {
@@ -30,10 +30,7 @@ p.push = function (job) {
     this.has[job.id] = job
     if (!this.waiting) {
       this.waiting = true
-      var self = this
-      _.nextTick(function () {
-        self.flush()
-      })
+      _.nextTick(this.flush, this)
     }
   } else if (job.override) {
     var oldJob = this.has[job.id]
@@ -54,11 +51,11 @@ p.flush = function () {
     this._preFlush()
   }
   // do not cache length because more jobs might be pushed
-  // as we execute existing jobs
+  // as we run existing jobs
   for (var i = 0; i < this.queue.length; i++) {
     var job = this.queue[i]
     if (!job.cancelled) {
-      job.execute()
+      job.run()
     }
   }
   this.reset()

@@ -40,6 +40,11 @@ When events are used extensively for cross-vm communication, the ready hook can 
 
 ### removed options: `id`, `tagName`, `className`, `attributes`, `lazy`.
 
+### new option: `inheritScope`.
+
+Default: `true`.
+Whether to inherit parent scope data. Set it to `false` if you want to create a component that have an isolated scope of its own.
+
 Since now a vm must always be provided the `el` option or explicitly mounted to an existing element, the element creation releated options have been removed for simplicity. If you need to modify your element's attributes, simply do so in the new `beforeMount` hook.
 
 The `lazy` option is removed because this does not belong at the vm level. Users should be able to configure individual `v-model` instances to be lazy or not.
@@ -72,12 +77,16 @@ computed: {
 ### New options
 
 - `literal`: replaces old options `isLiteral` and `isEmpty`.
-- `twoway`: indicates the directive is two-way and may write back to the model. Allows the use of `directive.set(value)`.
-- `paramAttributes`: an Array of attribute names to extract as parameters for the directive. For example, given the option value `['lazy']` and markup `<input v-my-dir="msg" my-param="123">`, you can access `this.params['my-param']` with value `'123'` inside directive functions.
+- `twoway`: indicates the directive is two-way and may write back to the model. Allows the use of `this.set(value)` inside directive functions.
+- `paramAttributes`: an Array of attribute names to extract as parameters for the directive. For example, given the option value `['my-param']` and markup `<input v-my-dir="msg" my-param="123">`, you can access `this.params['my-param']` with value `'123'` inside directive functions.
 
 ### Removed options: `isLiteral`, `isEmpty`, `isFn`
 
 - `isFn` is no longer necessary for directives expecting function values.
+
+## Interpolation
+
+Text bindings will no longer automatically stringify objects. Use the new `json` filter which gives more flexibility in formatting. Also, `null` will now be printed as is; only `undefined` will yield empty string.
 
 ## Two Way filters
 
@@ -109,6 +118,40 @@ Vue.filter('format', {
   <my-bio></my-bio>
 <!-- v-if-end -->
 ```
+
+``` html
+<!-- v-partial="hello" -->
+```
+
+**Note** The old inline partial syntax `{{> partial}}` has been removed. This is to keep the semantics of interpolation tags purely for interpolation purposes; flow control and partials are now either used in the form of attribute directives or comment directives.
+
+## Config API change
+
+Instead of the old `Vue.config()` with a heavily overloaded API, the config object is now available globally as `Vue.config`, and you can simply change its properties:
+
+``` js
+// old
+// Vue.config('debug', true)
+
+// new
+Vue.config.debug = true
+```
+
+## Prefix
+
+Config prefix now should include the hyphen: so the default is now `v-` and if you want to change it make sure to include the hyphen as well. e.g. `Vue.config.prefix = "data-"`.
+
+## Interpolation Delimiters
+
+In the old version the interpolation delimiters are limited to the same base character (i.e. `['{','}']` translates into `{{}}` for text and `{{{}}}` for HTML). Now you can set them to whatever you like (*almost), and to indicate HTML interpolation, simply wrap the tag with one extra outer most character on each end. Example:
+
+``` js
+Vue.config.delimiters = ['(%', '%)']
+// tags now are (% %) for text
+// and ((% %)) for HTML
+```
+
+* Note you still cannot use `<` or `>` in delimiters because Vue uses DOM-based templating.
 
 ## (Experimental) Validators
 

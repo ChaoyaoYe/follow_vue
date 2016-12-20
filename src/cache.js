@@ -54,7 +54,7 @@ p.put = function (key, value) {
   } else {// if the tail entry is empty, let new entry be the head
     this.head = entry
   }
-  this.tail = entry // reset the tail entry of cache 
+  this.tail = entry // reset the tail entry of cache
   if (this.size === this.limit) {// judge the size to determine whether to get rid of the old entry.
     return this.shift()
   } else {
@@ -70,12 +70,8 @@ p.put = function (key, value) {
 p.shift = function () {
   var entry = this.head
   if (entry) {
-    if (this.head.newer) {
-      this.head = this.head.newer
-      this.head.older = undefined
-    } else {
-      this.head = undefined
-    }
+    this.head = this.head.newer
+    this.head.older = undefined
     entry.newer = entry.older = undefined
     this._keymap[entry.key] = undefined
   }
