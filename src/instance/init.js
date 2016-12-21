@@ -1,5 +1,5 @@
 var Emitter = require('../emitter')
-var mergeOptions = require('../util').mergeOptions
+var mergeOptions = require('../util/merge-option')
 
 /**
  * The main init sequence. This is called for every instance,
@@ -17,13 +17,25 @@ exports._init = function (options) {
 
   this.$el          = null
   this._data        = options.data || {}
-  this._blockNodes  = null
-  this._isDestroyed = false
+  this.$            = {}
   this._rawContent  = null
   this._emitter     = new Emitter(this)
   this._watchers    = {}
   this._activeWatcher = null
   this._directives  = []
+
+  // block instance properties
+  this._isBlock = false
+  this.blockStart = null
+  this.blockEnd = null
+
+  // lifecycle state
+  this._isCompiled = false
+  this._isDestroyed = false
+
+  // anonymous instances are created by flow-control
+  // directives such as v-if and v-repeat
+  this._isAnonymous = options.anonymous
 
   // setup parent relationship
   this.$parent = options.parent
@@ -46,9 +58,6 @@ exports._init = function (options) {
   // create scope.
   // @creates this.$scope
   this._initScope()
-
-  // setup initial data.
-  this._initData(this._data, true)
 
   // setup property proxying
   this._initProxy()

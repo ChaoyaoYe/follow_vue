@@ -18,19 +18,34 @@ exports._initElement = function (el) {
       _.warn('Cannot find element: ' + selector)
     }
   }
-  // If the passed in `el` is a DocumentFragment, the instance is
-  // considered a "block instance" which manages not a single element,
-  // but multiple elements. A block instance's `$el` is an Array of
-  // the elements it manages.
   if (el instanceof DocumentFragment) {
-    this._blockNodes = _.toArray(el.childNodes)
-    this.$el = document.createElement('vue-block')
+    this._initBlock(el)
+    this._initContent(el)
   } else {
     this.$el = el
+    this._initTemplate()
   }
   this.$el.__vue__ = this
-  this._initTemplate()
-  this._initContent()
+}
+
+/**
+ * Initialize a block that manages a group of
+ * nodes instead of one element, the group is denoted by
+ * a starting node and an ending node
+ *
+ * @param {DocumentFragment} el
+ */
+
+exports._initBlock = function (frag) {
+  this._isBlock = true
+  this.$el =
+  this._blockStart =
+    document.createComment('v-block-start')
+  this._blockEnd =
+    document.createComment('v-block-end')
+  _.prepend(this._blockStart, frag)
+  frag.appendChild(this._blockEnd)
+  this._blockFragment = frag
 }
 
 /**
@@ -55,16 +70,17 @@ exports._initTemplate = function () {
           // the template contains multiple nodes
           // in this case the original `el` is simply
           // a placeholder.
-          this._blockNodes = _.toArray(frag.childNodes)
-          this.$el = document.createComment('vue-block')
+          this._initBlock(frag)
+          this._initContent(_.toArray(frag.children))
         } else {
           // 1 to 1 replace, we need to copy all the
           // attributes from the original el to the replacer
           this.$el = frag.firstChild
           _.copyAttributes(el, this.$el)
+          this._initContent(this.$el)
         }
         if (el.parentNode) {
-          _.before(this.$el, el)
+          this.$before(el)
           _.remove(el)
         }
       } else {
@@ -97,10 +113,12 @@ exports._collectRawContent = function () {
  * working draft:
  *
  *  http://www.w3.org/TR/2013/WD-components-intro-20130606/#insertion-points
+ *
+ * @param {Element|DocumentFragment} el
  */
 
-exports._initContent = function () {
-  var outlets = getOutlets(this.$el)
+exports._initContent = function (el) {
+  var outlets = getOutlets(el)
   var raw = this._rawContent
   var i = outlets.length
   var outlet, select, j, main
@@ -146,7 +164,7 @@ var concat = [].concat
 function getOutlets(el) {
   return _.isArray(el)
     ? concat.apply([], el.map(getOutlets))
-    : _.toArray(el.getElementByTagName('content'))
+    : _.toArray(el.querySelectorAll('content'))
 }
 
 /**

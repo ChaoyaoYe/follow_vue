@@ -6,10 +6,10 @@
  * @return {String}
  */
 
-exports.guard = function (value) {
-  return value === undefined
+exports.toString = function (value) {
+  return value === null
     ? ''
-    : value
+    : value.toString()
 }
 
 /**
@@ -20,7 +20,7 @@ exports.guard = function (value) {
  * @return {*|Number}
  */
 
-exports.guardNumber = function (value) {
+exports.toNumber = function (value) {
   return (
     isNaN(value) ||
     value === null ||
@@ -30,15 +30,30 @@ exports.guardNumber = function (value) {
 }
 
 /**
+ * Strip quotes from a string
+ *
+ * @param {String} str
+ * @return {String | false}
+ */
+
+exports.stripQuotes = function (str) {
+  var a = str.charCodeAt(0)
+  var b = str.charCodeAt(str.length - 1)
+  return a === b && (a === 0x22 || a === 0x27)
+    ? str.slice(1, -1)
+    : false
+}
+
+/**
  * Simple bind, faster than native
  *
  * @param {Function} fn
  * @param {Object} ctx
+ * @return {Function}
  */
 
 exports.bind = function (fn, ctx) {
   return function () {
-    // bind actually return the function execute the function pass in to certain ctx
     return fn.apply(ctx, arguments)
   }
 }
@@ -47,13 +62,18 @@ exports.bind = function (fn, ctx) {
  * Convert an Array-like object to a real Array.
  *
  * @param {Array-like} list
- * @param {Number} [i] - start index
+ * @param {Number} [start] - start index
+ * @return {Array}
  */
 
-var slice = [].slice
-
-exports.toArray = function (list, i) {
-  return slice.call(list, i || 0)
+exports.toArray = function (list, start) {
+  start = start || 0
+  var l = list.length
+  var ret = new Array(l - start)
+  for(var i = start; i < l; i++){
+    ret[i - start] = list[i]
+  }
+  return ret
 }
 
 /**
@@ -62,7 +82,7 @@ exports.toArray = function (list, i) {
  * @param {Object} to
  * @param {Object} from
  */
-//copy properties to target object.
+
 exports.extend = function (to, from) {
   for (var key in from) {
     to[key] = from[key]
@@ -70,7 +90,8 @@ exports.extend = function (to, from) {
 }
 
 /**
- * Mixin including non-enumerables, and copy property descriptors.
+ * Mixin including non-enumerables, and copy property
+ * descriptors.
  *
  * @param {Object} to
  * @param {Object} from
@@ -78,8 +99,8 @@ exports.extend = function (to, from) {
 
 exports.deepMixin = function (to, from) {
   Object.getOwnPropertyNames(from).forEach(function (key) {
-    var descriptor = Object.getOwnPropertyDescriptor(from, key)
-    Object.defineProperty(to, key, descriptor)
+    var desc =Object.getOwnPropertyDescriptor(from, key)
+    Object.defineProperty(to, key, desc)
   })
 }
 
@@ -90,7 +111,7 @@ exports.deepMixin = function (to, from) {
  * @param {Object} from
  * @param {String} key
  */
-// copy certain property to target object combine the accessor
+
 exports.proxy = function (to, from, key) {
   if (to.hasOwnProperty(key)) return
   Object.defineProperty(to, key, {
@@ -113,8 +134,9 @@ exports.proxy = function (to, from, key) {
  * @return {Boolean}
  */
 
+var toString = Object.prototype.toString
 exports.isObject = function (obj) {
-  return Object.prototype.toString.call(obj) === '[object Object]'
+  return toString.call(obj) === '[object Object]'
 }
 
 /**
@@ -136,7 +158,7 @@ exports.isArray = function (obj) {
  * @param {*} val
  * @param {Boolean} [enumerable]
  */
-// add a non-enumerable(unchangable) property to obj
+
 exports.define = function (obj, key, val, enumerable) {
   Object.defineProperty(obj, key, {
     value        : val,
@@ -156,7 +178,7 @@ exports.define = function (obj, key, val, enumerable) {
  */
 
 exports.augment = '__proto__' in {}
-  ? function(target, proto) {
+  ? function (target, proto) {
       target.__proto__ = proto
-   }
-  : exports.deepMixin
+    }
+: exports.deepMixin

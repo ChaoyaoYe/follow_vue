@@ -13,11 +13,13 @@ var templateParser = require('../parse/template')
  */
 
 exports._compile = function () {
-  if (this._blockNodes) {
-    this._blockNodes.forEach(this._compileNode, this)
+  if (this._isBlock) {
+    _.toArray(this._blockFragment.childNodes)
+      .forEach(this._compileNode, this)
   } else {
     this._compileNode(this.$el)
   }
+  this._isCompiled = true
 }
 
 /**
@@ -28,25 +30,16 @@ exports._compile = function () {
  */
 
 exports._compileNode = function (node) {
-  switch (node.nodeType) {
-    case 1: // element
-      if (node.tagName !== 'SCRIPT') {
-        this._compileElement(node)
-      }
-      break
-    case 3: // text
-      if (config.interpolate) {
-        this._compileTextNode(node)
-      }
-      break
-    case 8: // comment
-      this._compileComment(node)
-      break
+  var type = node.nodeType
+  if (type === 1 && node.tagName !== 'SCRIPT') {
+    this._compileElement(node)
+  } else if (type === 3 && config.interpolate) {
+    this._compileTextNode(node)
   }
 }
 
 /**
- * Compile an Element
+ * Compile an Element.
  *
  * @param {Element} node
  */
@@ -62,7 +55,7 @@ exports._compileElement = function (node) {
   var hasAttributes = node.hasAttributes()
   // check priority directives
   if (hasAttributes) {
-    if (this._checkPriorityDirectives(node)) {
+    if (this._checkPriorityDirs(node)) {
       return
     }
   }
@@ -86,7 +79,10 @@ exports._compileElement = function (node) {
 }
 
 /**
- * Compile attribtues on an Element
+ * Compile attribtues on an Element.
+ * Collect directives, sort them by priority,
+ * then bind them. Also check normal directives for
+ * param attributes and interpolation bindings.
  *
  * @param {Element} node
  */
@@ -103,7 +99,9 @@ exports._compileAttrs = function (node) {
     if (attrName.indexOf(config.prefix) === 0) {
       dirName = attrName.slice(config.prefix.length)
       if (registry[dirName]) {
-        node.removeAttribute(attrName)
+        if (dirName !== 'cloak') {
+          node.removeAttribute(attrName)
+        }
         dirs.push({
           name: dirName,
           value: attr.value
@@ -129,7 +127,13 @@ exports._compileAttrs = function (node) {
 }
 
 /**
- * Compile a TextNode
+ * Compile a TextNode.
+ * Possible interpolations include:
+ *
+ * - normal text binding,    e.g. {{text}}
+ * - unescaped html binding, e.g. {{{html}}}
+ * - one-time text binding,  e.g. {{*text}}
+ * - one-time html binding,  e.g. {{{*html}}}
  *
  * @param {TextNode} node
  */
@@ -170,84 +174,36 @@ exports._compileTextNode = function (node) {
 }
 
 /**
- * Compile a comment node (check for block flow-controls)
- *
- * @param {CommentNode} node
- */
-
-exports._compileComment = function (node) {
-
-}
-
-/**
- * Check an attribute for potential bindings
- */
-
-exports._bindAttr = function (node, attr) {
-  var tokens = textParser.parse(attr.value)
-  if (!tokens) {
-    return
-  }
-  if(tokens.length > 1){
-    _.warn(
-      'Invalid attribute binding: "' + attr.value + '"' +
-      '\nUse one single interpolation tag in ' +
-      'attribute bindings.'
-    )
-    return
-  }
-  //wrap namespace attribute so it won't mess up
-  // the directive parser
-  var arg = attr.name.indexOf(':') > 0
-    ? "'" + attr.name + "'"
-    : attr.name
-  this._bindDirective(
-    'attr',
-    arg + ':' + tokens[0].value,
-    node
-  )
-}
-
-/**
- * Helper to translate token value into expression parts.
- *
- * @param {Object} token
- * @return {String}
- */
-
-function expifyToken (token) {
-  return token.tag
-    ? token.value
-    : ("'" + token.value + "'")
-}
-
-/**
  * Check for priority directives that would potentially
- * skip other directives:
- *
- * - v-pre
- * - v-repeat
- * - v-if
- * - v-component
+ * skip other directives. Each priority directive, once
+ * detected, will cause the compilation to skip the rest
+ * and let that directive handle the rest. This allows,
+ * for example, "v-repeat" to handle how it should handle
+ * the situation when "v-component" is also present, and
+ * "v-component" won't have to worry about that.
  *
  * @param {Element} node
  * @return {Boolean}
  */
 
-exports._checkPriorityDirectives = function (node) {
-  var value
-  /* jshint boss: true */
+var priorityDirs = [
+  'repeat',
+  'component',
+  'if'
+]
+
+exports._checkPriorityDirs = function (node) {
   if (_.attr(node, 'pre') !== null) {
     return true
-  } else if (value = _.attr(node, 'repeat')) {
-    this._bindDirective('repeat', value)
-    return true
-  } else if (value = _.attr(node, 'if')) {
-    this._bindDirective('if', value)
-    return true
-  } else if (value = _.attr(node, 'component')) {
-    this._bindDirective('component', value)
-    return true
+  }
+  var value, dir
+  /* jshint boss: true */
+  for (var i = 0, l = priorityDirs.length; i < l; i++) {
+    dir = priorityDirs[i]
+    if (value = _.attr(node, dir)) {
+      this._bindDirective(dir, value, node)
+      return true
+    }
   }
 }
 
@@ -267,4 +223,59 @@ exports._bindDirective = function (name, value, node) {
       new Direcitve(name, node, this, descriptors[i])
     )
   }
+}
+
+/**
+ * Check a normal attribute for bindings.
+ * A normal attribute could potentially be:
+ *
+ * - a param attribute (only on root nodes)
+ * - an interpolated attribute, e.g. attr="{{data}}"
+ */
+
+exports._bindAttr = function (node, attr) {
+  var name = attr.name
+  var value = attr.value
+  // check if this is a param attribute.
+  var params = this.$options.paramAttributes
+  var isParam =
+    node === this.$el && // only check on root node
+    params &&
+    params.indexOf(name) > -1
+  if (isParam) {
+    node.removeAttribute(name)
+  }
+  // parse attribute value
+  var tokens = textParser.parse(value)
+  if (!tokens) {
+    if (isParam) {
+      this.$set(name, value)
+    }
+    return
+  }
+  // only 1 binding tag allowed
+  if (tokens.length > 1) {
+    _.warn(
+      'Invalid attribute binding: "' +
+      name + '="' + value + '"' +
+      '\nDon\'t mix binding tags with plain text ' +
+      'in attribute bindings.'
+    )
+    return
+  }
+  // param attributes are bound as v-with
+  var dirName = isParam
+    ? 'with'
+    : 'attr'
+  // wrap namespaced attribute so it won't mess up
+  // the directive parser
+  var arg = name.indexOf(':') > 0
+    ? "'" + name + "'"
+    : name
+  // bind
+  this._bindDirective(
+    dirName,
+    arg + ':' + tokens[0].value,
+    node
+  )
 }

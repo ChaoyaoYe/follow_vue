@@ -1,23 +1,17 @@
 var _ = require('../util')
-var assetTypes = [
-  'directive',
-  'filter',
-  'partial',
-  'effect',
-  'component'
-]
+var mergeOptions = require('../util/merge-option')
 
 /**
  * Expose useful internals
  */
 
 exports.util       = _
-exports.config     = config
 exports.nextTick   = _.nextTick
-exports.transition = require('../transition/transition')
+exports.config     = require('../config')
+exports.transition = require('../transition')
 
 /**
- * Class inheritance
+ * Class inehritance
  *
  * @param {Object} extendOptions
  */
@@ -29,7 +23,7 @@ exports.extend = function (extendOptions) {
   }
   Sub.prototype = Object.create(Super.prototype)
   _.define(Sub.prototype, 'constructor', Sub)
-  Sub.options = _.mergeOptions(Super.options, extendOptions)
+  Sub.options = mergeOptions(Super.options, extendOptions)
   Sub.super = Super
   // allow further extension
   Sub.extend = Super.extend
@@ -67,22 +61,44 @@ exports.use = function (plugin) {
 /**
  * Define asset registration methods on a constructor.
  *
- * @param {Function} Ctor
+ * @param {Function} Constructor
  */
 
-createAssetRegisters(exports)
-function createAssetRegisters (Ctor) {
+var assetTypes = [
+  'directive',
+  'filter',
+  'partial',
+  'transition'
+]
+
+function createAssetRegisters (Constructor) {
+
+  /* Asset registration methods share the same signature:
+   *
+   * @param {String} id
+   * @param {*} definition
+   */
+
   assetTypes.forEach(function (type) {
-
-    /**
-     * Asset registration method.
-     *
-     * @param {String} id
-     * @param {*} definition
-     */
-
-    Ctor[type] = function (id, definition) {
+    Constructor[type] = function (id, definition) {
       this.options[type + 's'][id] = definition
     }
   })
+
+  /**
+   * Component registration needs to automatically invoke
+   * Vue.extend on object values.
+   *
+   * @param {String} id
+   * @param {Object|Function} definition
+   */
+
+  Constructor.component = function (id, definition) {
+    if (_.isObject(definition)) {
+      definition = _.Vue.extend(definition)
+    }
+    this.options.components[id] = definition
+  }
 }
+
+createAssetRegisters(exports)

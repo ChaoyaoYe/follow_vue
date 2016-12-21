@@ -10,7 +10,7 @@ var objectAgumentations = Object.create(Object.prototype)
  * @public
  */
 
-__.define(objectAgumentations, '$add', function(key, val){
+__.define(objectAgumentations, '$add', function $add (key, val){
   if(this.hasOwnProperty(key)) return
   this[key] = val
   //make sure it's defined on itself
@@ -30,7 +30,7 @@ __.define(objectAgumentations, '$add', function(key, val){
  * @public
  */
 
-__.define(objectAgumentations, '$delete', function (key){
+__.define(objectAgumentations, '$delete', function $delete (key){
   if(!this.hasOwnProperty(key)) return
   delete this[key]
   var ob = this.$observer

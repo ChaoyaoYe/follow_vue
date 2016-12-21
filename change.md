@@ -30,20 +30,17 @@ This is very useful, but it probably should only be available in implicit child 
 
 It's probably easy to understand why `el` and `parent` are instance only. But why `data`? Because it's really easy to shoot yourself in the foot when you use `data` in `Vue.extend()`. Non-primitive values will be shared by reference across all instances created from that constructor, and changing it from one instance will affect the state of all the others! It's a bit like shared properties on the prototype. In vanilla javascript, the proper way to initialize instance data is to do so in the constructor: `this.someData = {}`. Similarly in Vue, you can do so in the `created` hook by setting `this.$data.someData = {}`.
 
-### new option: `syncData`.
-
-A side effect of the new scope/data model is that the `data` object being passed in is no longer mutated by default, because all its properties are copied into the scope instead, and the scope is now the source of truth. To sync changes to the scope back to the original data object, you need to now explicitly pass in  `syncData: true` in the options. In most cases, this is not necessary, but you do need to be aware of this.
-
 ### new option: `events`.
 
 When events are used extensively for cross-vm communication, the ready hook can get kinda messy. The new `events` option is similar to its Backbone equivalent, where you can declaratiely register a bunch of event listeners.
 
+### new option: `isolated`.
+
+Default: `false`.
+
+Whether to inherit parent scope data. Set it to `true` if you want to create a component that have an isolated scope of its own. An isolated scope means you won't be able to bind to data on parent scopes in the component's template.
+
 ### removed options: `id`, `tagName`, `className`, `attributes`, `lazy`.
-
-### new option: `inheritScope`.
-
-Default: `true`.
-Whether to inherit parent scope data. Set it to `false` if you want to create a component that have an isolated scope of its own.
 
 Since now a vm must always be provided the `el` option or explicitly mounted to an existing element, the element creation releated options have been removed for simplicity. If you need to modify your element's attributes, simply do so in the new `beforeMount` hook.
 
@@ -54,10 +51,6 @@ The `lazy` option is removed because this does not belong at the vm level. Users
 ### new hook: `beforeMount`
 
 This new hook is introduced to accompany the separation of instantiation and DOM mounting. It is called right before the DOM compilation starts and `this.$el` is available, so you can do some pre-processing on the element here.
-
-### removed hooks: `attached` & `detached`
-
-These two have caused confusions about when they'd actually fire, and proper use cases seem to be rare. Let me know if you have important use cases for these two hooks.
 
 ## Computed Properties
 
@@ -74,19 +67,27 @@ computed: {
 
 ## Directive changes
 
+### Dynamic literals
+
+Literal directives can now also be dynamic via bindings like this:
+
+``` html
+<div v-component="{{test}}"></div>
+```
+
+When `test` changes, the component used will change! This essentially replaces the old `v-view` directive.
+
+When authoring literal directives, you can now provide an `update()` function if you wish to handle it dynamically. If no `update()` is provided the directive will be treated as a static literal and only evaluated once.
+
 ### New options
 
-- `literal`: replaces old options `isLiteral` and `isEmpty`.
-- `twoway`: indicates the directive is two-way and may write back to the model. Allows the use of `this.set(value)` inside directive functions.
-- `paramAttributes`: an Array of attribute names to extract as parameters for the directive. For example, given the option value `['my-param']` and markup `<input v-my-dir="msg" my-param="123">`, you can access `this.params['my-param']` with value `'123'` inside directive functions.
+- `twoWay`: indicates the directive is two-way and may write back to the model. Allows the use of `this.set(value)` inside directive functions.
 
-### Removed options: `isLiteral`, `isEmpty`, `isFn`
-
-- `isFn` is no longer necessary for directives expecting function values.
+### Removed option: `isEmpty`
 
 ## Interpolation
 
-Text bindings will no longer automatically stringify objects. Use the new `json` filter which gives more flexibility in formatting. Also, `null` will now be printed as is; only `undefined` will yield empty string.
+Text bindings will no longer automatically stringify objects. Use the new `json` filter which gives more flexibility in formatting.
 
 ## Two Way filters
 
@@ -105,25 +106,45 @@ Vue.filter('format', {
 
 ## Block logic control
 
-``` html
-<!-- v-repeat="list" -->
-  <h2>{{title}}</h2>
-  <p>{{content}}</p>
-<!-- v-repeat-end -->
+One limitation of flow control direcitves like `v-repeat` and `v-if` is that they can only be used on a single element. Now you can use them to manage a block of content by using them on a `<template>` element that wraps the content you want managed:
+
+``` js
+items: [
+  {
+    title: 'title-1',
+    subtitle: 'subtitle-1',
+    content: 'content-1'
+  },
+  {
+    title: 'title-2',
+    subtitle: 'subtitle-2',
+    content: 'content-2'
+  }
+]
 ```
 
 ``` html
-<!-- v-if="showProfile" -->
-  <my-avatar></my-avatar>
-  <my-bio></my-bio>
-<!-- v-if-end -->
+<template v-repeat="item:items">
+  <h2>{{item.title}}</h2>
+  <p>{{item.subtitle}}</p>
+  <p>{{item.content}}</p>
+</template>
 ```
+
+Rendered result:
 
 ``` html
-<!-- v-partial="hello" -->
+<!--v-block-start-->
+<h2>title-1</h2>
+<p>subtitle-1</p>
+<p>content-1</p>
+<!--v-block-end-->
+<!--v-block-start-->
+<h2>title-2</h2>
+<p>subtitle-2</p>
+<p>content-2</p>
+<!--v-block-end-->
 ```
-
-**Note** The old inline partial syntax `{{> partial}}` has been removed. This is to keep the semantics of interpolation tags purely for interpolation purposes; flow control and partials are now either used in the form of attribute directives or comment directives.
 
 ## Config API change
 
@@ -153,24 +174,94 @@ Vue.config.delimiters = ['(%', '%)']
 
 * Note you still cannot use `<` or `>` in delimiters because Vue uses DOM-based templating.
 
-## (Experimental) Validators
-
-This is largely write filters that accept a Boolean return value. Probably should live as a plugin.
-
-``` html
-  <input v-model="abc @ email">
-```
-
-``` js
-  Vue.validator('email', function (val) {
-    return val.match(...)
-  })
-  // this.$validation.abc // false
-  // this.$valid // false
-```
-
-## (Experimental) One time interpolations
+## One time interpolations
 
 ``` html
 <span>{{* hello }}</span>
 ```
+
+## `$watch` API change
+
+`vm.$watch` can now accept an expression:
+
+``` js
+vm.$watch('a + b', function (newVal, oldVal) {
+  // do something
+})
+```
+
+By default the callback only fires when the value changes. If you want it to be called immediately with the initial value, use the third optional `immediate` argument:
+
+``` js
+vm.$watch('a', callback, true)
+// callback is fired immediately with current value of `a`
+```
+
+## Simplified Transition API
+
+- no more distinctions between `v-transition`, `v-animation` or `v-effect`;
+- no more configuring enter/leave classes in `Vue.config`;
+- `Vue.effect` has been replaced with `Vue.transition`, the `effects` option has also been replaced by `transitions`.
+
+With `v-transition="my-transition"`, Vue will:
+
+1. Try to find a transition definition object registered either through `Vue.transition(id, def)` or passed in with the `transitions` option, with the id `"my-transition"`. If it finds it, it will use that definition object to perform the custom JavaScript based transition.
+
+2. If no custom JavaScript transition is found, it will automatically sniff whether the target element has CSS transitions or CSS animations applied, and add/remove the classes as before.
+
+3. If no transitions/animations are detected, the DOM manipulation is executed immediately instead of hung up waiting for an event.
+
+### JavaScript transitions API change
+
+Now more similar to Angular:
+
+``` js
+Vue.transition('fade', {
+ enter: function (el, done) {
+    // element is already inserted into the DOM
+    // call done when animation finishes.
+    $(el)
+      .css('opacity', 0)
+      .animate({ opacity: 1 }, 1000, done)
+    // optionally return a "cancel" function
+    // to clean up if the animation is cancelled
+    return function () {
+      $(el).stop()
+    }
+  },
+  leave: function (el, done) {
+    // same as enter
+    $(el)
+      .animate({ opacity: 0 }, 1000, done)
+    return function () {
+      $(el).stop()
+    }
+  }
+})
+```
+## Events API
+
+Now if an event handler return `false`, it will stop event propagation for `$dispatch` and stop broadcasting to children for `$broadcast`.
+
+``` js
+var a = new Vue()
+var b = new Vue({
+  parent: a
+})
+var c = new Vue({
+  parent: b
+})
+
+a.$on('test', function () {
+  console.log('a')
+})
+b.$on('test', function () {
+  console.log('b')
+  return false
+})
+c.$on('test', function () {
+  console.log('c')
+})
+c.$dispatch('test')
+// -> 'c'
+// -> 'b'

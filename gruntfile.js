@@ -22,7 +22,7 @@ module.exports = function (grunt) {
         src: 'src/**/*.js'
       },
       test: {
-        src: 'test/**/*.js'
+        src: 'test/unit/specs/**/*.js'
       }
     },
 
@@ -31,11 +31,11 @@ module.exports = function (grunt) {
         frameworks: ['jasmine', 'commonjs'],
         files: [
           'src/**/*.js',
-          'test/unit/specs/*.js'
+          'test/unit/specs/**/*.js'
         ],
         preprocessors: {
           'src/**/*.js': ['commonjs'],
-          'test/unit/specs/*.js': ['commonjs']
+          'test/unit/specs/**/*.js': ['commonjs']
         },
         singleRun: true
       },
@@ -51,7 +51,7 @@ module.exports = function (grunt) {
           reporters: ['progress', 'coverage'],
           preprocessors: {
             'src/**/*.js': ['commonjs', 'coverage'],
-            'test/unit/specs/*.js: ['commonjs']'
+            'test/unit/specs/**/*.js: ['commonjs']'
           },
           coverageReporter: {
             reporters: [
@@ -92,7 +92,7 @@ module.exports = function (grunt) {
         dest: 'benchmarks/browser.js'
       },
       test: {
-        src: ['test/unit/specs/*.js'],
+        src: ['test/unit/specs/**/*.js'],
         dest: 'test/unit/specs.js'
       }
     },
@@ -132,6 +132,11 @@ module.exports = function (grunt) {
   grunt.registerTask('cover', ['karma:phantom'])
   grunt.registerTask('bench', ['browserify:bench]')
   grunt.registerTask('watch', ['browserify:watch'])
-  grunt.registerTask('build', ['browserify:test', 'browserify:build', 'uglify:build'])
+  grunt.registerTask('build', [
+    'browserify:test',
+    'browserify:build',
+    'uglify:build'],
+    'size'
+  )
 
 }

@@ -1,7 +1,6 @@
 //automatically fill in component.json's script field
 
 module.exports = function (grunt) {
-  
   grunt.registerTask('component', function(){
 
     var jsRE = /\.js$/

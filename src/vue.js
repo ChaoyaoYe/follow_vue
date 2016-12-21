@@ -1,5 +1,5 @@
 var _ = require('./util')
-var extend = require('./util').extend
+var extend = _.extend
 
 /**
  * The exposed Vue constructor.
@@ -37,9 +37,8 @@ exports.options = {
   directives   : require('../directives'),
   filters      : require('../filters'),
   partials     : {},
-  effects      : {},
-  components   : {},
-  inheritScope : true
+  transitions  : {},
+  components   : {}
 }
 
 /**
@@ -70,7 +69,7 @@ Object.defineProperty(p, '$data', {
     return this._data
   },
   set: function (newData) {
-    this._initData(newData)
+    this._setData(newData)
   }
 })
 
@@ -94,4 +93,4 @@ extend(p, require('./api/dom'))
 extend(p, require('./api/events'))
 extend(p, require('./api/lifecycle'))
 
-module.exports = Vue
+module.exports = _.Vue = Vue

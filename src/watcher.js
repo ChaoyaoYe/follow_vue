@@ -41,7 +41,7 @@ function Watcher (vm, expression, cb, ctx, filters, needSet) {
   res = expParser.parse(expression, needSet)
   this.getter = res.get
   this.setter = res.set
-  this.initDeps(res.paths)
+  this.initDeps(res)
 }
 
 var p = Watcher.prototype
@@ -58,15 +58,24 @@ var p = Watcher.prototype
  * the directive will end up with no dependency at all and
  * never gets updated.
  *
- * @param {Array} paths
+ * @param {Object} res - expression parser result object
  */
 
-p.initDeps = function (paths) {
-  var i = paths.length
+p.initDeps = function (res) {
+  var i = res.paths.length
   while (i--) {
-    this.addDep(paths[i])
+    this.addDep(res.paths[i])
   }
+  // temporarily set computed to true
+  // to force dep collection on first evaluation
+  this.isComputed = true
   this.value = this.get()
+  var computed = this.vm.$options.computed
+  var exp = this.expression
+  this.isComputed =
+    this.filters || // filters may access instance data
+    res.computed || // inline expression
+    (computed && computed[exp]) // computed property
 }
 
 /**
@@ -95,10 +104,14 @@ p.addDep = function (path) {
  */
 
 p.get = function () {
-  this.beforeGet()
+  if(this.isComputed){
+    this.beforeGet()
+  }
   var value = this.getter.call(this.vm, this.vm.$scope)
-  value = _.applyFilters(value, this.readFilters)
-  this.afterGet()
+  value = _.applyFilters(value, this.readFilters, this.vm)
+  if(this.isComputed){
+    this.afterGet()
+  }
   return value
 }
 

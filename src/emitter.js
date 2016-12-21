@@ -1,3 +1,5 @@
+var _ = require('./util')
+
 /**
  * Simple event emitter based on component/emitter.
  *
@@ -6,6 +8,7 @@
  */
 
 function Emitter (ctx) {
+  this._cancelled = false // allow return false in event handlers to cancel propagation/broadcasting
   this._ctx = ctx || this
 }
 
@@ -38,12 +41,10 @@ p.on = function(event, fn){
 p.once = function(event, fn){
   var self = this
   this._cbs = this._cbs || {}
-
   function on () {
     self.off(event, on)
     fn.apply(this, arguments)
   }
-
   on.fn = fn
   this.on(event, on)
   return this
@@ -60,23 +61,19 @@ p.once = function(event, fn){
 
 p.off = function (event, fn) {
   this._cbs = this._cbs || {}
-
   //all
   if(!arguments.length){
     this._cbs = {}
     return this
   }
-
   //specific events
   var callbacks = this._cbs[event]
   if(!callbacks) return this
-
   //remove all handlers
   if(arguments.length === 1){
     delete this._cbs[event]
     return this
   }
-
   //remove specific handler
   var cb
   for (var i = 0; i < callbacks.length; i++){
@@ -102,12 +99,11 @@ p.emit = function(event, a, b, c) {
   var callbacks = this._cbs[event]
 
   if(callbacks){
-    callbacks = callbacks.slice(0)
-    for(var i = 0, len = callbacks.length; i < len; i++){
+    callbacks = _.toArray(callbacks)
+    for(var i = 0, l = callbacks.length; i < 1; i++){
       callbacks[i].call(this._ctx, a, b, c) // what emit means is invoking the callback function
     }
   }
-
   return this
 }
 
@@ -120,17 +116,25 @@ p.emit = function(event, a, b, c) {
  */
 
 p.applyEmit = function (event){
+  this._cancelled = false
   this._cbs = this._cbs || {}
-  var callbacks = this._cbs[event], args
-
+  var callbacks = this._cbs[event]
   if(callbacks) {
-    callbacks = callbacks.slice(0)
-    args = callbacks.slice.call(arguments, 1)
-    for (var i = 0, len = callbacks.length; i < len; i++){
-      callbacks[i].apply(this._ctx, args)
+    // avoid leaking arguments
+    // http://jsperf.com/closure-with-arguments
+    var i
+    var l = arguments.length
+    var args = new Array(l - 1)
+    for(i = 1; i < l; i++){
+      args[i - 1] = arguments[i]
+    }
+    callbacks = _.toArray(callbacks)
+    for( i= 0, l = callbacks.length; i < l; i++){
+      if(callbacks[i].apply(this._ctx, args) === false){
+        this._cancelled = true
+      }
     }
   }
-
   return this
 }
 

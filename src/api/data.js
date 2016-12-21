@@ -65,12 +65,16 @@ exports.$delete = function (key) {
  *
  * @param {String} exp
  * @param {Function} cb
+ * @param {Boolean} [immediate]
  * @return {Number}
  */
 
-exports.$watch = function (exp, cb) {
+exports.$watch = function (exp, cb, immediate) {
   var watcher = new Watcher(this, exp, cb, this)
   this._watchers[watcher.id] = watcher
+  if(immediate) {
+    cb.call(this, watcher.value)
+  }
   return watcher.id
 }
 
@@ -105,7 +109,8 @@ exports.$eval = function (text) {
     return dir.filters
       ? _.applyFilters(
           this.$get(dir.expression),
-          _.resolveFilters(this, dir.filters).read
+          _.resolveFilters(this, dir.filters).read,
+          this
         )
       : this.$get(dir.expression)
   } else {
@@ -125,11 +130,13 @@ exports.$interpolate = function (text) {
   var tokens = textParser.parse(text)
   var vm = this
   if (tokens) {
-    return tokens.map(function (token) {
-      return token.tag
-        ? vm.$eval(token.value)
-        : token.value
-    }).join('')
+    return tokens.length === 1
+      ? vm.$eval(tokens[0].value)
+      : tokens.map(function (token) {
+          return token.tag
+            ? vm.$eval(token.value)
+            : token.value
+        }).join('')
   } else {
     return text
   }

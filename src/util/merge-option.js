@@ -1,6 +1,6 @@
 // alias debug as _ so we can drop _.warn during uglification
-var _ = require('./debug')
-var extend = require('./lang').extend
+var _ = require('./index')// karma commonjs bridge cannot handle ./
+var extend = _.extend
 
 /**
  * Option overwriting strategies are functions that handle
@@ -23,7 +23,7 @@ var strats = {}
 strats.created =
 strats.ready =
 strats.attached =
-strats.detached = 
+strats.detached =
 strats.beforeMount =
 strats.beforeDestroy =
 strats.afterDestroy =
@@ -42,7 +42,7 @@ strats.paramAttributes = function (parentVal, childVal) {
 strats.directives =
 strats.filters =
 strats.partials =
-strats.effects =
+strats.transitions =
 strats.components = function (parentVal, childVal, key, vm) {
   var ret = Object.create(
     vm && vm.$parent
@@ -103,6 +103,25 @@ var defaultStrat = function (parentVal, childVal) {
 }
 
 /**
+ * Make sure component options get converted to actual
+ * constructors.
+ *
+ * @param {Object} components
+ */
+
+function guardComponents (components) {
+  if (components) {
+    var def
+    for (var key in components) {
+      def = components[key]
+      if (_.isObject(def)) {
+        components[key] = _.Vue.extend(def)
+      }
+    }
+  }
+}
+
+/**
  * Merge two option objects into a new one.
  * Core utility used in both instantiation and inheritance.
  *
@@ -112,7 +131,8 @@ var defaultStrat = function (parentVal, childVal) {
  *                     an instantiation merge.
  */
 
-exports.mergeOptions = function (parent, child, vm) {
+module.exports = function mergeOptions(parent, child, vm) {
+  guardComponents(child.components)
   var options = {}
   var key
   for (key in parent) {
