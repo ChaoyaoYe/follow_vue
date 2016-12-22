@@ -14,23 +14,23 @@ var arrayAugmentations = Object.create(Array.prototype)
   'sort',
   'reverse'
 ]
-.forEach(function(method) {
-  //cache original method
-  var original = Array.prototype[mehod]
-  //define wrapped method
-  _.define(arrayAugmentations, method, function(){
+.forEach(function (method) {
+  // cache original method
+  var original = Array.prototype[method]
+
+  function mutator () {
     // avoid leaking arguments:
     // http://jsperf.com/closure-with-arguments
-    var l = arguments.length
-    var args = new Array(l)
-    for(var i = 0; i < l; i++){
+    var i = arguments.length
+    var args = new Array(i)
+    while(i--) {
       args[i] = arguments[i]
     }
     var result = original.apply(this, args)
-    var ob = this.$observer
+    var ob = this.__ob__
     var inserted, removed, index
 
-    switch(method){
+    switch (method) {
       case 'push':
         inserted = args
         index = this.length - args.length
@@ -54,21 +54,21 @@ var arrayAugmentations = Object.create(Array.prototype)
         break
     }
 
-    //link/unlink added/removed elements
-    if(inserted) ob.link(inserted, index)
-    if(removed) ob.unlink(removed)
+    // link/unlink added/removed elements
+    if (inserted) ob.link(inserted, index)
+    if (removed) ob.unlink(removed)
 
-    //update indices
-    if(method !== 'push' && 'method' !== 'pop'){
-      ob.notify('set', 'length', this.length)
+    // update indices
+    if (method !== 'push' && method !== 'pop') {
+      ob.updateIndices()
     }
 
-    //emit length change
-    if(inserted || removed){
+    // emit length change
+    if (inserted || removed) {
       ob.propagate('set', 'length', this.length)
     }
 
-    //empty path, value is the Array itself
+    // empty path, value is the Array itself
     ob.propagate('mutate', '', this, {
       method   : method,
       args     : args,
@@ -79,7 +79,13 @@ var arrayAugmentations = Object.create(Array.prototype)
     })
 
     return result
-  })
+  }
+  // define wrapped method
+  if (_.hasProto) {
+    _.define(arrayAugmentations, method, mutator)
+  } else {
+    arrayAugmentations[method] = mutator
+  }
 })
 
 /**
@@ -91,28 +97,35 @@ var arrayAugmentations = Object.create(Array.prototype)
  * @return {*} - replaced element
  */
 
-_.define(arrayAugmentations， '$set', function(index, val){
-  if(index >= this.length) {
+function $set (index, val) {
+  if (index >= this.length) {
     this.length = index + 1
   }
   return this.splice(index, 1, val)[0]
-})
+}
 
 /**
- * Convenience method to remove the element at given element
+ * Convenience method to remove the element at given index.
  *
  * @param {Number} index
- * @param  {*} val
+ * @param {*} val
  */
 
-_.define(arrayAugmentations, '$remove', function(index){
-  if(typeof index !== 'number'){
+function $remove (index) {
+  if (typeof index !== 'number') {
     index = this.indexOf(index)
   }
-  if(index > -1){
+  if (index > -1) {
     return this.splice(index, 1)[0]
   }
+}
 
-})
+if (_.hasProto) {
+  _.define(arrayAugmentations, '$set', $set)
+  _.define(arrayAugmentations, '$remove', $remove)
+} else {
+  arrayAugmentations.$set = $set
+  arrayAugmentations.$remove = $remove
+}
 
 module.exports = arrayAugmentations

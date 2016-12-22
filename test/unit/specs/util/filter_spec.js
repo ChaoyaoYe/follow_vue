@@ -2,11 +2,6 @@ var _ = require('../../../../src/util')
 
 describe('Util - Filter', function () {
 
-  var debug = require('../../../../src/util/debug')
-  beforeEach(function () {
-    spyOn(debug, 'warn')
-  })
-
   it('resolveFilters', function () {
     var filters = [
       { name: 'a', args: ['a'] },
@@ -14,6 +9,9 @@ describe('Util - Filter', function () {
       { name: 'c' }
     ]
     var vm = {
+      _asset: function(type, id){
+        return this.$options[type][id]
+      },
       $options: {
         filters: {
           a: function (v, arg) {
@@ -52,7 +50,6 @@ describe('Util - Filter', function () {
     expect(writeB.value).toBe(3)
     expect(writeB.arg).toBe('b')
 
-    expect(debug.warn).toHaveBeenCalled()
   })
 
   it('applyFilters', function () {

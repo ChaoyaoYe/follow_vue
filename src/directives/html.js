@@ -11,7 +11,7 @@ module.exports = {
     }
   },
   update : function (value) {
-    value = _.guard(value)
+    value = _.toString(value)
     if (this.nodes) {
       this.swap(value)
     } else {
@@ -28,6 +28,6 @@ module.exports = {
     var frag = templateParser.parse(value, true)
     // save a reference to these nodes so we can remove later
     this.nodes = _.toArray(frag.childNodes)
-    _.befoe(frag, this.el)
+    _.before(frag, this.el)
   }
 }

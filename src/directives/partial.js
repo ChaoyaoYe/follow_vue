@@ -7,19 +7,18 @@ module.exports = {
 
   bind: function () {
     var id = this.expression
-    var partial = this.vm.$options.partials[id]
+    var partial = this.vm._asset('partials', id)
     if (!partial) {
       return
     }
     partial = templateParser.parse(partial, true)
     // comment ref node means inline partial
-    if (el.nodeType === 8) {
+    if (el.nodeType === 8) { //comment
       var el = this.el
       var vm = this.vm
       // keep a ref for the partial's content nodes
       var nodes = _.toArray(partial.childNodes)
-      _.before(partial, el)
-      _.remove(el)
+      _.replace(el, partial)
       // compile partial after appending, because its
       // children's parentNode will change from the fragment
       // to the correct parentNode. This could affect
@@ -34,3 +33,7 @@ module.exports = {
   }
 
 }
+
+/**
+ * working on v-repeat
+ */

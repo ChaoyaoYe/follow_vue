@@ -8,6 +8,7 @@ describe('Watcher', function () {
 
   beforeEach(function () {
     vm = new Vue({
+      filters: {},
       data: {
         a: 1,
         b: {
@@ -112,7 +113,7 @@ describe('Watcher', function () {
     var watcher2 = new Watcher(vm, 'b.e', spy)
     expect(watcher.value).toBeUndefined()
     expect(watcher2.value).toBeUndefined()
-    vm.$scope.$add('d', { e: 123 })
+    vm.$add('d', { e: 123 })
     vm.b.$add('e', 234)
     nextTick(function () {
       expect(watcher.value).toBe(123)
@@ -126,7 +127,7 @@ describe('Watcher', function () {
   it('$delete', function (done) {
     var watcher = new Watcher(vm, 'b.c', spy)
     expect(watcher.value).toBe(2)
-    vm.$scope.$delete('b')
+    vm.$delete('b')
     nextTick(function () {
       expect(watcher.value).toBeUndefined()
       expect(spy).toHaveBeenCalledWith(undefined, 2)
@@ -175,6 +176,22 @@ describe('Watcher', function () {
         expect(watcher.value).toBe(newData)
         done()
       })
+    })
+  })
+
+  it('watching parent scope properties', function (done) {
+    var child = vm._addChild()
+    var spy2 = jasmine.createSpy('watch')
+    var watcher1 = new Watcher(child, '$data', spy)
+    var watcher2 = new Watcher(child, 'a', spy2)
+    vm.a = 123
+    nextTick(function () {
+      // $data should only be called on self data change
+      expect(watcher1.value).toBe(child.$data)
+      expect(spy.calls.count()).toBe(0)
+      expect(watcher2.value).toBe(123)
+      expect(spy2).toHaveBeenCalledWith(123, 1)
+      done()
     })
   })
 

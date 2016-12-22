@@ -3,10 +3,12 @@ module.exports = {
   priority: 900,
 
   bind: function () {
-    var self = this
-    this.vm.$watch(this.arg, function(val){
-      self.set(_.toNumber(val))
-    })
+    if(this.arg) {
+      var self = this
+      this.vm.$watch(this.arg, function(val) {
+        self.set(_.toNumber(val))
+      })
+    }
   },
 
   update: function (value) {
@@ -18,3 +20,7 @@ module.exports = {
   }
 
 }
+
+/**
+ * v-with绑定数据变化
+ */

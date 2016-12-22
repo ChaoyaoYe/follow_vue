@@ -19,7 +19,6 @@ exports._compile = function () {
   } else {
     this._compileNode(this.$el)
   }
-  this._isCompiled = true
 }
 
 /**
@@ -90,40 +89,49 @@ exports._compileElement = function (node) {
 exports._compileAttrs = function (node) {
   var attrs = _.toArray(node.attributes)
   var i = attrs.length
-  var registry = this.$options.directives
+  // var registry = this.$options.directives
   var dirs = []
-  var attr, attrName, dir, dirName
+  var attr, attrName, dir, dirName, dirDef
   while (i--) {
     attr = attrs[i]
     attrName = attr.name
     if (attrName.indexOf(config.prefix) === 0) {
       dirName = attrName.slice(config.prefix.length)
-      if (registry[dirName]) {
+      dirDef = this._asset('directives', dirName)
+      if (dirDef) {
         if (dirName !== 'cloak') {
           node.removeAttribute(attrName)
         }
         dirs.push({
           name: dirName,
-          value: attr.value
+          value: attr.value,
+          def: dirDef
         })
-      } else {
-        _.warn('Failed to resolve directive: ' + dirName)
       }
     } else if (config.interpolate) {
       this._bindAttr(node, attr)
     }
   }
   // sort the directives by priority, low to high
-  dirs.sort(function (a, b) {
-    a = registry[a.name].priority || 0
-    b = registry[b.name].priority || 0
-    return a > b ? 1 : -1
-  })
+  dirs.sort(directiveComparator)
   i = dirs.length
   while (i--) {
     dir = dirs[i]
-    this._bindDirective(dir.name, dir.value, node)
+    this._bindDirective(dir.name, dir.value, node, dir.def)
   }
+}
+
+/**
+ * Directive priority sort comparator
+ *
+ * @param {Object} a
+ * @param {Object} b
+ */
+
+function directiveComparator (a, b) {
+  a = a.def.priority || 0
+  b = b.def.priority || 0
+  return a > b ? 1 : -1
 }
 
 /**
@@ -156,9 +164,13 @@ exports._compileTextNode = function (node) {
       } else {
         value = token.value
         if (token.html) {
-          el = document.createComment('vue-html')
+          el = document.createComment('v-html')
           _.before(el, node)
           this._bindDirective('html', value, el)
+        } else if (token.partial) {
+          el = document.createComment('v-partial')
+          _.before(el, node)
+          this._bindDirective('partial', value, el)
         } else {
           el = document.createTextNode('')
           _.before(el, node)
@@ -198,7 +210,7 @@ exports._checkPriorityDirs = function (node) {
   }
   var value, dir
   /* jshint boss: true */
-  for (var i = 0, l = priorityDirs.length; i < l; i++) {
+  for (var i = 0; i < 3; i++) {
     dir = priorityDirs[i]
     if (value = _.attr(node, dir)) {
       this._bindDirective(dir, value, node)
@@ -213,14 +225,16 @@ exports._checkPriorityDirs = function (node) {
  * @param {String} name
  * @param {String} value
  * @param {Element} node
+ * @param {Object} [def]
  */
 
-exports._bindDirective = function (name, value, node) {
+exports._bindDirective = function (name, value, node, def) {
   var descriptors = dirParser.parse(value)
   var dirs = this._directives
+  def = def || this._asset('directives', name)
   for (var i = 0, l = descriptors.length; i < l; i++) {
     dirs.push(
-      new Direcitve(name, node, this, descriptors[i])
+      new Direcitve(name, node, this, descriptors[i], def)
     )
   }
 }

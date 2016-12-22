@@ -7,8 +7,7 @@ module.exports = {
     var el = this.el
     if (!el.__vue__) {
       this.ref = document.createComment('v-if')
-      _.after(this.ref, el)
-      _.remove(el)
+      _.repace(el ,this.ref)
       this.inserted = false
       if (el.tagName === 'TEMPLATE') {
         this.el = templateParser.parse(el)
@@ -39,7 +38,7 @@ module.exports = {
   },
 
   build: function () {
-    this.childVM = new _.Vue({
+    this.childVM = this.vm._addChild({
       el: this.el,
       parent: this.vm,
       anonymous: true
@@ -53,3 +52,7 @@ module.exports = {
   }
 
 }
+
+/**
+ * v-if绑定的时候在对应的element中打入comment并删除element，更新时重新创建新的element插入。
+ */

@@ -50,7 +50,7 @@ exports.remove = function (el, cb, vm) {
 }
 
 /**
- * Remove by appending to another parent with transition.
+ * This is only used in block operations.
  *
  * @oaram {Element} el
  * @param {Element} target
@@ -77,28 +77,24 @@ exports.removeThenAppend = function (el, target, cb, vm) {
  */
 
 var apply = exports.apply = function (el, direction, op, vm) {
-  function applyOp () {
-    op()
-    vm._callHook(direction > 0 ? 'attached' : 'detached')
-  }
-  // determine the transition type on the element
   var transData = el.__v_trans
-  if(
+  if (
     !transData ||
     // if the vm is being manipulated by a parent directive
     // during the parent's compilation phase, skip the
-    // animation
+    // animation.
     (vm.$parent && !vm.$parent._isCompiled)
-  ){
-    return applyOp()
+  ) {
+    return op()
   }
-  var jsTransition = transData && registry[transData.id]
+  // determine the transition type on the element
+  var jsTransition = vm._asset('transitions', transData.id)
   if (jsTransition) {
     // js
     applyJSTransition(
       el,
       direction,
-      applyOp,
+      op,
       transData,
       jsTransition
     )
@@ -107,11 +103,11 @@ var apply = exports.apply = function (el, direction, op, vm) {
     applyCSSTransition(
       el,
       direction,
-      applyOp,
+      op,
       transData
     )
   } else {
     // not applicable
-    applyOp()
+    op()
   }
 }

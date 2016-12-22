@@ -9,7 +9,7 @@ var map = {
     2,
     '<table><tbody></tbody><colgroup>',
     '</colgroup></table>'
-  ],
+  ]
 }
 
 map.td =
@@ -147,7 +147,7 @@ exports.parse = function (template, clone) {
   if (template instanceof DocumentFragment) {
     return clone
       ? template.cloneNode(true)
-      : template 
+      : template
   }
 
   if (typeof template === 'string') {

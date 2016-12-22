@@ -62,3 +62,7 @@ module.exports = {
     this.el.removeEventListener('load', this.iframeBind)
   }
 }
+
+/**
+ * v-on在bind的时候特别处理了当元素为iframe的情况。
+ */

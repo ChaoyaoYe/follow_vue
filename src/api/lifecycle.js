@@ -1,3 +1,5 @@
+var _ = require('../util')
+
 /**
  * Set instance target element and kick off the compilation process.
  * The passed in `el` can be a selector string, an existing Element,
@@ -8,10 +10,24 @@
  */
 
 exports.$mount = function (el) {
-  this._callHook('beforeMount')
+  if(this._isCompiled){
+    _.warn('$mount() should be called only once')
+    return
+  }
+  this._callHook('beforeCompile')
   this._initElement(el)
   this._compile()
-  this._callHook('ready')
+  this._isCompiled = true
+  this._callHook('compiled')
+  this.$once('hook:attached', function(){
+    this._isAttached = true
+    this._isReady = true
+    this._callHook('ready')
+    //this.initDOMHooks()
+  })
+  if(_.inDoc(this.$el)){
+    this._callHook('atached')
+  }
 }
 
 /**
@@ -26,7 +42,6 @@ exports.$destroy = function (remove) {
   if (this._isDestroyed) {
     return
   }
-  this._isDestroyed = true
   this._callHook('beforeDestroy')
   // remove DOM element
   if (remove) {
@@ -36,8 +51,6 @@ exports.$destroy = function (remove) {
       this.$remove()
     }
   }
-  this.$el.__vue__ = null
-  this.$el = null
   var i
   // remove self from parent. only necessary
   // if this is called by the user.
@@ -47,9 +60,11 @@ exports.$destroy = function (remove) {
     parent._children.splice(i)
   }
   // destroy all children.
-  i = this._children.length
-  while (i--) {
-    this._children[i].$destroy()
+  if(this._children){
+    i = this._children.length
+    while (i--) {
+      this._children[i].$destroy()
+    }
   }
   // teardown data/scope
   this._teardownScope()
@@ -62,5 +77,16 @@ exports.$destroy = function (remove) {
   while (i--) {
     this._directives[i]._teardown()
   }
+  // clear up
+  this._children =
+  this._watchers =
+  this.activeWatcher =
+  this.$el =
+  this.$el.__vue__ =
+  this._directives = null
+  // call the last hook ...
+  this._isDestroyed = true
   this._callHook('afterDestroy')
+  // turn off all instance listeners
+  this._emitter.off()
 }

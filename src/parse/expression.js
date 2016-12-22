@@ -97,7 +97,7 @@ function compileExpFns (exp, needSet) {
   // reset state
   saved.length = 0
   paths = []
-  has = Object.create(null)
+  has = {}
   // save strings and object literal keys
   var body = exp
     .replace(saveRE, save)

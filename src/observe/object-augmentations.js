@@ -1,26 +1,25 @@
-var __ = require('../util')
+var _ = require('../util')
 var objectAgumentations = Object.create(Object.prototype)
 
 /**
  * Add a new property to an observed object
- * and emits corresponding events
+ * and emits corresponding event
  *
  * @param {String} key
  * @param {*} val
  * @public
  */
 
-__.define(objectAgumentations, '$add', function $add (key, val){
-  if(this.hasOwnProperty(key)) return
-  this[key] = val
-  //make sure it's defined on itself
-  __.define(this, key, val, true)
-  var ob = this.$observer
+function $add (key, val) {
+  if (this.hasOwnProperty(key)) return
+  // make sure it's defined on itself.
+  _.define(this, key, val, true)
+  var ob = this.__ob__
   ob.observe(key, val)
   ob.convert(key, val)
   ob.emit('add:self', key, val)
   ob.propagate('add', key, val)
-})
+}
 
 /**
  * Deletes a property from an observed object
@@ -30,12 +29,20 @@ __.define(objectAgumentations, '$add', function $add (key, val){
  * @public
  */
 
-__.define(objectAgumentations, '$delete', function $delete (key){
-  if(!this.hasOwnProperty(key)) return
+function $delete (key) {
+  if (!this.hasOwnProperty(key)) return
   delete this[key]
-  var ob = this.$observer
+  var ob = this.__ob__
   ob.emit('delete:self', key)
   ob.propagate('delete', key)
-})
+}
+
+if (_.hasProto) {
+  _.define(objectAgumentations, '$add', $add)
+  _.define(objectAgumentations, '$delete', $delete)
+} else {
+  objectAgumentations.$add = $add
+  objectAgumentations.$delete = $delete
+}
 
 module.exports = objectAgumentations

@@ -58,59 +58,6 @@ describe('Util - Language Enhancement', function () {
     expect(to.b).toBe(from.b)
   })
 
-  it('deepMixin', function () {
-    var from = Object.create({c:123})
-    var to = {}
-    Object.defineProperty(from, 'a', {
-      enumerable: false,
-      configurable: true,
-      get: function () {
-        return 'AAA'
-      }
-    })
-    Object.defineProperty(from, 'b', {
-      enumerable: true,
-      configurable: false,
-      value: 'BBB'
-    })
-    _.deepMixin(to, from)
-    var descA = Object.getOwnPropertyDescriptor(to, 'a')
-    var descB = Object.getOwnPropertyDescriptor(to, 'b')
-
-    expect(descA.enumerable).toBe(false)
-    expect(descA.configurable).toBe(true)
-    expect(to.a).toBe('AAA')
-
-    expect(descB.enumerable).toBe(true)
-    expect(descB.configurable).toBe(false)
-    expect(to.b).toBe('BBB')
-
-    expect(to.c).toBeUndefined()
-  })
-
-  it('proxy', function () {
-    var to = { test2: 'to' }
-    var from = { test2: 'from' }
-    var val = '123'
-    Object.defineProperty(from, 'test', {
-      get: function () {
-        return val
-      },
-      set: function (v) {
-        val = v
-      }
-    })
-    _.proxy(to, from, 'test')
-    expect(to.test).toBe(val)
-    to.test = '234'
-    expect(val).toBe('234')
-    expect(to.test).toBe(val)
-    // should not overwrite existing property
-    _.proxy(to, from, 'test2')
-    expect(to.test2).toBe('to')
-
-  })
-
   it('isObject', function () {
     expect(_.isObject({})).toBe(true)
     expect(_.isObject([])).toBe(false)
@@ -140,13 +87,14 @@ describe('Util - Language Enhancement', function () {
   })
 
   it('augment', function () {
+    var target = {}
+    var proto = { a: 1 }
+    _.augment(target, proto)
     if ('__proto__' in {}) {
-      var target = {}
-      var proto = {}
-      _.augment(target, proto)
       expect(target.__proto__).toBe(proto)
     } else {
-      expect(_.augment).toBe(_.deepMixin)
+      expect(Object.keys(target).length).toBe(0)
+      expect(target.a).toBe(1)
     }
   })
 

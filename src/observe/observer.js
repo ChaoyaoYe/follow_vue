@@ -26,28 +26,22 @@ var OBJECT = 1
  * @extends Emitter
  * @param {Array|Object} value
  * @param {Number} type
- * @param {Object} [options]
- *                 - doNotAlterProto: if true, do not alter object's __proto__
- *                 - callbackContext: `this` context for callbacks
  */
 
-function Observer (value, type, options) {
-  Emitter.call(this, options && options.callbackContext)
+function Observer (value, type) {
+  Emitter.call(this)
   this.id = ++uid
   this.value = value
   this.type = type
   this.parents = null
+  this.parentsHash = null
   if (value) {
-    _.define(value, '$observer', this)
+    _.define(value, '__ob__', this)
     if (type === ARRAY) {
       _.augment(value, arrayAugmentations)
       this.link(value)
     } else if (type === OBJECT) {
-      if (options && options.doNotAlterProto) {
-        _.deepMixin(value, objectAugmentations)
-      } else {
-        _.augment(value, objectAugmentations)
-      }
+      _.augment(value, objectAugmentations)
       this.walk(value)
     }
   }
@@ -84,41 +78,35 @@ Observer.emitGet = false
  */
 
 Observer.create = function (value, options) {
-  if (value &&
-      value.hasOwnProperty('$observer') &&
-      value.$observer instanceof Observer) {
-    return value.$observer
-  } if (_.isArray(value)) {
+  if (value && value.hasOwnProperty('__ob__')) {
+    return value.__ob__
+  } else if (_.isArray(value)) {
     return new Observer(value, ARRAY, options)
   } else if (
     _.isObject(value) &&
-    !value.$scope
-  ) { // avoid Vue instance
+    !value.$scope // avoid Vue instance
+  ) {
     return new Observer(value, OBJECT, options)
   }
 }
 
 /**
- * Walk through each property, converting them and adding them as child.
- * This method should only be called when value type is Object.
- * Properties prefixed with `$` or `_` and accessor properties are ignored.
+ * Walk through each property, converting them and adding
+ * them as child. This method should only be called when
+ * value type is Object. Properties prefixed with `$` or `_`
+ * and accessor properties are ignored.
  *
  * @param {Object} obj
  */
 
 p.walk = function (obj) {
-  var key, val, descriptor, prefix
-  for (key in obj) {
-    prefix = key.charAt(0)
-    if (
-      prefix === 0x24 || // $
-      prefix === 0x5F    // _
-    ) {
-      continue
-    }
-    descriptor = Object.getOwnPropertyDescriptor(obj, key)
-    // only process own non-accessor properties
-    if (descriptor && !descriptor.get) {
+  var keys = Object.keys(obj)
+  var i = keys.length
+  var key, val, prefix
+  while (i--) {
+    key = keys[i]
+    prefix = key.charCodeAt(0)
+    if (prefix !== 0x24 && prefix !== 0x5F) { // skip $ or _
       val = obj[key]
       this.observe(key, val)
       this.convert(key, val)
@@ -134,7 +122,8 @@ p.walk = function (obj) {
 
 p.link = function (items, index) {
   index = index || 0
-  for (var i = 0, l = items.length; i < l; i++) {
+  var i = items.length
+  while (i--) {
     this.observe(i + index, items[i])
   }
 }
@@ -146,7 +135,8 @@ p.link = function (items, index) {
  */
 
 p.unlink = function (items) {
-  for (var i = 0, l = items.length; i < l; i++) {
+  var i = items.length
+  while (i--) {
     this.unobserve(items[i])
   }
 }
@@ -165,16 +155,20 @@ p.observe = function (key, val) {
   if (ob) {
     // register self as a parent of the child observer.
     var parents = ob.parents
+    var hash = ob.parentsHash
     if (!parents) {
-      ob.parents = parents = Object.create(null)
+      parents = ob.parents = []
+      hash = ob.parentsHash = {}
     }
-    if (parents[this.id]) {
+    if (!hash[this.id]) {
+      var p = {
+        ob: this,
+        key: key
+      }
+      parents.push(p)
+      hash[this.id] = p
+    } else {
       _.warn('Observing duplicate key: ' + key)
-      return
-    }
-    parents[this.id] = {
-      ob: this,
-      key: key
     }
   }
 }
@@ -187,8 +181,16 @@ p.observe = function (key, val) {
  */
 
 p.unobserve = function (val) {
-  if (val && val.$observer) {
-    val.$observer.parents[this.id] = null
+  if (val && val.__ob__) {
+    val.__ob__.parentsHash[this.id] = null
+    var parents = val.__ob__.parents
+    var i = parents.length
+    while (i--) {
+      if (parents[i].ob === this) {
+        parents.splice(i, 1)
+        break
+      }
+    }
   }
 }
 
@@ -216,7 +218,6 @@ p.convert = function (key, val) {
       ob.unobserve(val)
       val = newVal
       ob.observe(key, newVal)
-      ob.emit('set:self', key, newVal)
       ob.propagate('set', key, newVal)
     }
   })
@@ -233,12 +234,16 @@ p.convert = function (key, val) {
 
 p.propagate = function (event, path, val, mutation) {
   this.emit(event, path, val, mutation)
-  if (!this.parents) return
-  for (var id in this.parents) {
-    var parent = this.parents[id]
-    if (!parent) continue
-    var key = parent.key
-    var parentPath = path
+  var parents = this.parents
+  if (!parents) {
+    return
+  }
+  var parent, key, parentPath
+  var i = parents.length
+  while (i--) {
+    parent = parents[i]
+    key = parent.key
+    parentPath = path
       ? key + Observer.pathDelimiter + path
       : key
     parent.ob.propagate(event, parentPath, val, mutation)
@@ -255,9 +260,9 @@ p.updateIndices = function () {
   var i = arr.length
   var ob
   while (i--) {
-    ob = arr[i] && arr[i].$observer
+    ob = arr[i] && arr[i].__ob__
     if (ob) {
-      ob.parents[this.id].key = i
+      ob.parentsHash[this.id].key = i
     }
   }
 }

@@ -18,6 +18,7 @@ exports._init = function (options) {
   this.$el          = null
   this._data        = options.data || {}
   this.$            = {}
+  this.$root        = this.$root || this
   this._rawContent  = null
   this._emitter     = new Emitter(this)
   this._watchers    = {}
@@ -32,17 +33,12 @@ exports._init = function (options) {
   // lifecycle state
   this._isCompiled = false
   this._isDestroyed = false
+  this._isReady = false
+  this._isAttached = false
 
   // anonymous instances are created by flow-control
   // directives such as v-if and v-repeat
   this._isAnonymous = options.anonymous
-
-  // setup parent relationship
-  this.$parent = options.parent
-  this._children = []
-  if (this.$parent) {
-    this.$parent._children.push(this)
-  }
 
   // merge options.
   this.$options = mergeOptions(
@@ -55,18 +51,8 @@ exports._init = function (options) {
   // been set up & before data observation happens.
   this._callHook('created')
 
-  // create scope.
-  // @creates this.$scope
+  // Initialize data observertion and scope inheritance
   this._initScope()
-
-  // setup property proxying
-  this._initProxy()
-
-  // setup computed properties
-  this._initComputed()
-
-  // setup instance methods
-  this._initMethods()
 
   // setup binding tree.
   // @creates this._rootBinding

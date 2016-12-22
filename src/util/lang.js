@@ -1,4 +1,16 @@
 /**
+ * Check is a string starts with $ or _
+ *
+ * @param {String} str
+ * @return {Boolean}
+ */
+
+exports.isReserved = function(str){
+  var c = str.charCodeAt(0)
+  return c === 0x24 || c === 0x5F
+}
+
+/**
  * Guard text output, make sure undefined outputs
  * empty string
  *
@@ -68,9 +80,9 @@ exports.bind = function (fn, ctx) {
 
 exports.toArray = function (list, start) {
   start = start || 0
-  var l = list.length
-  var ret = new Array(l - start)
-  for(var i = start; i < l; i++){
+  var i = list.length - start
+  var ret = new Array(i)
+  while(i--){
     ret[i - start] = list[i]
   }
   return ret
@@ -87,43 +99,6 @@ exports.extend = function (to, from) {
   for (var key in from) {
     to[key] = from[key]
   }
-}
-
-/**
- * Mixin including non-enumerables, and copy property
- * descriptors.
- *
- * @param {Object} to
- * @param {Object} from
- */
-
-exports.deepMixin = function (to, from) {
-  Object.getOwnPropertyNames(from).forEach(function (key) {
-    var desc =Object.getOwnPropertyDescriptor(from, key)
-    Object.defineProperty(to, key, desc)
-  })
-}
-
-/**
- * Proxy a property on one object to another.
- *
- * @param {Object} to
- * @param {Object} from
- * @param {String} key
- */
-
-exports.proxy = function (to, from, key) {
-  if (to.hasOwnProperty(key)) return
-  Object.defineProperty(to, key, {
-    enumerable: true,
-    configurable: true,
-    get: function () {
-      return from[key]
-    },
-    set: function (val) {
-      from[key] = val
-    }
-  })
 }
 
 /**
@@ -171,14 +146,20 @@ exports.define = function (obj, key, val, enumerable) {
 /**
  * Augment an target Object or Array by either
  * intercepting the prototype chain using __proto__,
- * or copy over property descriptors
+ * or copy over property descriptors with defineProperty
  *
  * @param {Object|Array} target
  * @param {Object} proto
  */
 
-exports.augment = '__proto__' in {}
-  ? function (target, proto) {
+var define = exports.define
+var hasProto = exports.hasProto = '__proto__' in {}
+exports.augment = hasProto
+  ? function(target, proto){
       target.__proto__ = proto
     }
-: exports.deepMixin
+  : function(target, proto){
+      for(var key in proto){
+        define(target, key, proto[key])
+      }
+    }

@@ -24,9 +24,10 @@ strats.created =
 strats.ready =
 strats.attached =
 strats.detached =
-strats.beforeMount =
+strats.beforeCompile =
+this.compiled =
 strats.beforeDestroy =
-strats.afterDestroy =
+strats.destroyed =
 strats.paramAttributes = function (parentVal, childVal) {
   return (parentVal || []).concat(childVal || [])
 }
@@ -34,24 +35,23 @@ strats.paramAttributes = function (parentVal, childVal) {
 /**
  * Assets
  *
- * When a vm is present (instance creation), we need to do a
- * 3-way merge for assets: constructor assets, instance assets,
- * and instance scope assets.
+ * When a vm is present (instance creation), we skip the
+ * merge here because it is faster to resolve assets
+ * dynamically only when needed
  */
 
 strats.directives =
 strats.filters =
 strats.partials =
 strats.transitions =
-strats.components = function (parentVal, childVal, key, vm) {
-  var ret = Object.create(
-    vm && vm.$parent
-      ? vm.$parent.$options[key]
-      : null
-  )
-  extend(ret, parentVal)
-  extend(ret, childVal)
-  return ret
+strats.components = function (parentVal, childVal, vm) {
+  if(vm) {
+    return childVal
+  } else {
+    var ret = Object.create(parentVal || null)
+    extend(ret, childVal)
+    return ret
+  }
 }
 
 /**
@@ -62,7 +62,7 @@ strats.components = function (parentVal, childVal, key, vm) {
  */
 
 strats.events = function (parentVal, childVal) {
-  var ret = Object.create(null)
+  var ret = {}
   extend(ret, parentVal)
   for (var key in childVal) {
     var parent = ret[key]
@@ -76,13 +76,11 @@ strats.events = function (parentVal, childVal) {
 
 /**
  * Other object hashes.
- * These are instance-specific and do not inherit from nested parents.
  */
 
 strats.methods =
 strats.computed = function (parentVal, childVal) {
-  var ret = Object.create(null)
-  extend(ret, parentVal)
+  var ret = Object.create(parentVal || null)
   extend(ret, childVal)
   return ret
 }
@@ -139,7 +137,7 @@ module.exports = function mergeOptions(parent, child, vm) {
     merge(key)
   }
   for (key in child) {
-    if (!(key in parent)) {
+    if (!(parent.hasOwnProperty(key))) {
       merge(key)
     }
   }
@@ -152,7 +150,7 @@ module.exports = function mergeOptions(parent, child, vm) {
       return
     }
     var strat = strats[key] || defaultStrat
-    options[key] = strat(parent[key], child[key], key, vm)
+    options[key] = strat(parent[key], child[key], vm)
   }
   return options
 }

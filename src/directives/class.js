@@ -55,3 +55,7 @@ module.exports = function (value) {
     }
   }
 }
+
+/**
+ * 往element中添加或是删除class
+ */

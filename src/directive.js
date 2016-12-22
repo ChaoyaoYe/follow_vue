@@ -16,10 +16,11 @@ var expParser = require('./parse/expression')
  *                 - {String} expression
  *                 - {String} [arg]
  *                 - {Array<Object>} [filters]
+ * @param {Object} def
  * @constructor
  */
 
-function Directive (name, el, vm, descriptor) {
+function Directive (name, el, vm, descriptor, def) {
   // public
   this.name = name
   this.el = el
@@ -31,7 +32,7 @@ function Directive (name, el, vm, descriptor) {
   this._locked = false
   this._bound = false
   // init
-  this._bind()
+  this._bind(def)
 }
 
 var p = Directive.prototype
@@ -40,10 +41,12 @@ var p = Directive.prototype
  * Initialize the directive, mixin definition properties,
  * setup the watcher, call definition bind() and update()
  * if present.
+ *
+ * @param {Object} def
  */
 
-p._bind = function () {
-  _.extend(this, this.vm.$options.directives[this.name])
+p._bind = function (def) {
+  _.extend(this, def)
   this._watcherExp = this.expression
   this._checkDynamicLiteral()
   if (this.bind) {
@@ -116,7 +119,7 @@ p._checkExpFn = function () {
     var fn = expParser.parse(expression).get
     var vm = this.vm
     this.update(function () {
-      fn.call(vm, vm.$scope)
+      fn.call(vm, vm)
     })
     return true
   }
@@ -145,7 +148,9 @@ p._teardown = function () {
     if (this.unbind) {
       this.unbind()
     }
-    this._watcher.teardown()
+    if(this._watcher){ // fix directive teardown when no watcher is present
+      this._watcher.teardown()
+    }
     this._bound = false
   }
 }

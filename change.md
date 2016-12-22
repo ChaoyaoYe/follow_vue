@@ -18,9 +18,9 @@ In the previous version, nested Vue instances do not have prototypal inheritance
 
 In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! This is one of the major gotchas in Angular. If you are somewhat familiar with how prototype inehritance works, you might be surprised how this is possible. Well, the reason is that all data properties in Vue are getter/setters, and invoking a setter will not cause the child scope shadowing parent scopes. See the example [here](http://jsfiddle.net/yyx990803/Px2n6/).
 
-The result of this model is a much cleaner expression evaluation implementation. All expressions can simply be evaluated with the vm's `$scope` as the `this` context.
+The result of this model is a much cleaner expression evaluation implementation. All expressions can simply be evaluated against the vm.
 
-This is very useful, but it probably should only be available in implicit child instances created by flow-control directives like `v-repeat`, `v-if`, etc. Explicit components should retain its own root scope and use some sort of two way binding like `v-with` to bind to data from outer scope.
+You can also pass in `isolated: true` to avoid inheriting a parent scope, which can provide encapsulation for reusable components and improve performance.
 
 ## Option changes
 
@@ -42,15 +42,29 @@ Whether to inherit parent scope data. Set it to `true` if you want to create a c
 
 ### removed options: `id`, `tagName`, `className`, `attributes`, `lazy`.
 
-Since now a vm must always be provided the `el` option or explicitly mounted to an existing element, the element creation releated options have been removed for simplicity. If you need to modify your element's attributes, simply do so in the new `beforeMount` hook.
+Since now a vm must always be provided the `el` option or explicitly mounted to an existing element, the element creation releated options have been removed for simplicity. If you need to modify your element's attributes, simply do so in the new `beforeCompile` hook.
 
 The `lazy` option is removed because this does not belong at the vm level. Users should be able to configure individual `v-model` instances to be lazy or not.
 
 ## Hook changes
 
-### new hook: `beforeMount`
+### hook usage change: `created`
+
+This is now called before anything happens to the instance, with only `this.$data` being available, but **not observed** yet. In the past you can do `this.something = 1` to define default data, but it required some weird hack to make it work. Now you should just explicitly do `this.$data.something = 1` to define your instance default data.
+
+### hook usage change: `ready`
+
+The new `ready` hook now is only fired after the instance is compiled and **inserted into the document for the first time**. For a equivalence of the old `ready` hook, use the new `compiled` hook.
+
+### new hook: `beforeCompile`
 
 This new hook is introduced to accompany the separation of instantiation and DOM mounting. It is called right before the DOM compilation starts and `this.$el` is available, so you can do some pre-processing on the element here.
+
+### new hook: `compiled`
+
+The `compiled` hook indicates the element has been fully compiled based on initial data. However this doesn't indicate if the element has been inserted into the DOM yet. This is essentially the old `ready` hook.
+
+### renamed hook: `afterDestroy` -> `destroyed`
 
 ## Computed Properties
 
@@ -217,7 +231,7 @@ Now more similar to Angular:
 
 ``` js
 Vue.transition('fade', {
- enter: function (el, done) {
+  enter: function (el, done) {
     // element is already inserted into the DOM
     // call done when animation finishes.
     $(el)
@@ -239,6 +253,7 @@ Vue.transition('fade', {
   }
 })
 ```
+
 ## Events API
 
 Now if an event handler return `false`, it will stop event propagation for `$dispatch` and stop broadcasting to children for `$broadcast`.
@@ -265,3 +280,4 @@ c.$on('test', function () {
 c.$dispatch('test')
 // -> 'c'
 // -> 'b'
+```

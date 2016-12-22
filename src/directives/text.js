@@ -2,7 +2,7 @@ var _ = require('../util')
 
 module.exports = {
   bind : function () {
-    this.attr = this.el.nodeType === 3
+    this.attr = this.el.nodeType === 3 //text
       ? 'nodeValue'
       : 'textContent'
   },
