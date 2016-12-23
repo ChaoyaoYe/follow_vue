@@ -1,6 +1,6 @@
+var _ = require('../util')
 var Cache = require('../cache')
 var pathCache = new Cache(1000)
-var Observer = require('../observe/observer')
 var identRE = /^[$_a-zA-Z]+[\w$]*$/
 
 /**
@@ -222,17 +222,10 @@ function formatAccessor(key) {
  */
 
 exports.compileGetter = function (path) {
-  var body = 'if (o != null'
-  var pathString = 'o'
-  var key
-  for (var i = 0, l = path.length - 1; i < l; i++) {
-    key = path[i]
-    pathString += formatAccessor(key)
-    body += ' && ' + pathString + ' != null'
-  }
-  key = path[i]
-  pathString += formatAccessor(key)
-  body += ') return ' + pathString
+  var body =
+    'try{return o' +
+    path.map(formatAccessor).join('') +
+    '}catch(e){}'
   return new Function('o', body)
 }
 
@@ -270,24 +263,6 @@ exports.get = function (obj, path) {
 }
 
 /**
- * Get from an object from an Observer-delimitered path.
- * e.g. "a\bb\bc"
- *
- * @param {Object} obj
- * @param {String} path
- */
-
-exports.getFromObserver = function (obj, path) {
-  var hit = pathCache.get(path)
-  if (!hit) {
-    hit = path.split(Observer.pathDelimiter)
-    hit.get = exports.compileGetter(hit)
-    pathCache.put(path, hit)
-  }
-  return hit.get(obj)
-}
-
-/**
  * Set on an object from a path
  *
  * @param {Object} obj
@@ -300,14 +275,14 @@ exports.set = function (obj, path, val) {
     path = exports.parse(path)
   }
   var last, key
-  if (!path || isSettable(obj)) {
+  if (!path || _.isObject(obj)) {
     return false
   }
   for (var i = 0, l = path.length - 1; i < l; i++) {
     last = obj
     key = path[i]
     obj = obj[key]
-    if(!isSettable(obj)){
+    if(!_.isObject(obj)){
       obj = {}
       add(last, key, obj)
     }
@@ -319,19 +294,6 @@ exports.set = function (obj, path, val) {
     add(obj, key, val)
   }
   return true
-}
-
-
-/**
- * Check if a value is an object that can have values
- * set on it. Slightly faster than _.isObject.
- *
- * @param {*} val
- * @return {Boolean}
- */
-
-function isSettable (val) {
-  return val && typeof val === 'object'
 }
 
 /**

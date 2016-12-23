@@ -15,7 +15,7 @@ exports._objToArray = function (obj) {
   if (_.isArray(obj)) {
     return obj
   }
-  if (!_.isObject(obj)) {
+  if (!_.isPlainObject(obj)) {
     _.warn(
       'Invalid value for v-repeat: ' + obj +
       '\nOnly Arrays and Objects are allowed.'
@@ -25,7 +25,7 @@ exports._objToArray = function (obj) {
   var keys = Object.keys(obj)
   var i = keys.length
   var res = new Array(i)
-  var key 
+  var key
   while(i--) {
     key = keys[i]
     res[i] = {

@@ -25,7 +25,7 @@ var p = Emitter.prototype
 p.on = function(event, fn){
   this._cbs = this._cbs || {}
   ;(this._cbs[event] = this._cbs[event] || [])
-    .unshift(fn)
+    .push(fn)
   return this
 }
 
@@ -71,7 +71,7 @@ p.off = function (event, fn) {
   if(!callbacks) return this
   //remove all handlers
   if(arguments.length === 1){
-    delete this._cbs[event]
+    this._cbs[event] = null
     return this
   }
   //remove specific handler
@@ -89,7 +89,9 @@ p.off = function (event, fn) {
 
 /**
  * The internal, faster emit with fixed amount of arguments
- * using Function call
+ * using Function call. This emite assumes that callbacks
+ * triggered will not modify the callback list being
+ * literated through.
  *
  * @param {Object} event
  * @param {Emitter}
@@ -100,10 +102,7 @@ p.emit = function(event, a, b, c, d) {
   var callbacks = this._cbs[event]
 
   if(callbacks){
-    callbacks = _.toArray(callbacks)
-    var i = callbacks.length
-    var ctx = this.ctx
-    while(i--){
+    for(var i = 0, l = callbacks.length; i < l; i++){
       callbacks[i].call(this._ctx, a, b, c, d) // what emit means is invoking the callback function
     }
   }
@@ -131,8 +130,7 @@ p.applyEmit = function (event){
       args[i] = arguments[i + 1]
     }
     callbacks = _.toArray(callbacks)
-    i = callbacks.length
-    while(i--){
+    for(var l = callbacks.length; i < l; i++){
       if(callbacks[i].apply(this._ctx, args) === false){
         this._cancelled = true
       }

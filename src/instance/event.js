@@ -8,6 +8,7 @@ var inDoc = require('../util').inDoc
 
 exports._initEvents = function () {
   var events = this.$options.events
+  var emitter = this._emitter
   var options = this.$options
   var events = options.events
   var methods = options.methods
@@ -19,7 +20,7 @@ exports._initEvents = function () {
         var handler = typeof handlers[i] === 'string'
           ? methods && methods[handlers[i]]
           : handlers[i]
-        this.$on(e, handler)
+        emitter.on(e, handler)
       }
     }
   }
@@ -30,9 +31,9 @@ exports._initEvents = function () {
  */
 
 exports._initDOMHooks = function () {
-  var children = this._children
   this.$on('hook:attached', function () {
     this._isAttached = true
+    var children = this._children
     for (var i = 0, l = children.length; i < l; i++) {
       var child = children[i]
       if (!child._isAttached && inDoc(child.$el)) {
@@ -40,8 +41,9 @@ exports._initDOMHooks = function () {
       }
     }
   })
-  this.$on('hook:detached', function () {
+  emitter.on('hook:detached', function () {
     this._isAttached = false
+    var children = this._children
     for (var i = 0, l = children.length; i < l; i++) {
       var child = children[i]
       if (child._isAttached && !inDoc(child.$el)) {
@@ -64,5 +66,5 @@ exports._callHook = function (hook) {
       handlers[i].call(this)
     }
   }
-  this.$emit('hook:' + hook)
+  this._emitter.emit('hook:' + hook)
 }

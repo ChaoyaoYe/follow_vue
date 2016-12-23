@@ -16,19 +16,20 @@ var expParser = require('./parse/expression')
  *                 - {String} expression
  *                 - {String} [arg]
  *                 - {Array<Object>} [filters]
- * @param {Object} def
+ * @param {Object} def - directive definition object
+ * @param {Function} [linker] - pre-compiled linker function
  * @constructor
  */
 
-function Directive (name, el, vm, descriptor, def) {
+function Directive (name, el, vm, descriptor, def, linker) {
   // public
   this.name = name
   this.el = el
   this.vm = vm
-  this.arg = descriptor.arg
-  this.expression = descriptor.expression
-  this.filters = descriptor.filters
+  // copy descriptor props
+  _.extend(this, descriptor)
   // private
+  this._linker = linker
   this._locked = false
   this._bound = false
   // init
@@ -46,7 +47,11 @@ var p = Directive.prototype
  */
 
 p._bind = function (def) {
-  _.extend(this, def)
+  if(typeof def === 'function'){
+    this.update = def
+  } else {
+    _.extend(this, def)
+  }
   this._watcherExp = this.expression
   this._checkDynamicLiteral()
   if (this.bind) {
@@ -54,19 +59,31 @@ p._bind = function (def) {
   }
   if (
     this.expression && this.update &&
-    (!this.isLiteral || this._isDynamicLiteral)
+    (!this.isLiteral || this._isDynamicLiteral) &&
+    !this._checkExpFn()
   ) {
-    if (!this._checkExpFn()) {
-      this._watcher = new Watcher(
+    var exp = this._watcherExp
+    var watcher = this.vm._watchers[exp]
+    // wrapped updater for context
+    var dir = this
+    var update = this._udpate = function(val, oldVal){
+      if(!dir._locked){
+        dir.update(val, oldVal)
+      }
+    }
+    if(!watcher){
+      watcher = this.vm._watchers[exp] = new Watcher(
         this.vm,
-        this._watcherExp,
-        this._update, // callback
-        this, // callback context
+        exp,
+        updata,
         this.filters,
         this.twoWay // need setter
       )
-      this.update(this._watcher.value)
+    } else {
+      watcher.addCb(update)
     }
+    this._watcher = watcher
+    this.update(watcher.value)
   }
   this._bound = true
 }
@@ -126,20 +143,6 @@ p._checkExpFn = function () {
 }
 
 /**
- * Callback for the watcher.
- * Check locked or not before calling definition update.
- *
- * @param {*} value
- * @param {*} oldValue
- */
-
-p._update = function (value, oldValue) {
-  if (!this._locked) {
-    this.update(value, oldValue)
-  }
-}
-
-/**
  * Teardown the watcher and call unbind.
  */
 
@@ -148,10 +151,15 @@ p._teardown = function () {
     if (this.unbind) {
       this.unbind()
     }
-    if(this._watcher){ // fix directive teardown when no watcher is present
-      this._watcher.teardown()
+    var watcher = this._watcher
+    if(watcher && watcher.active){
+      watcher.removeCb(this._update)
+      if(!watcher.active){
+        this.vm._watchers[this.expression] = null
+      }
     }
     this._bound = false
+    this.vm = this.el = this._watcher = null
   }
 }
 

@@ -13,18 +13,24 @@ module.exports = {
         this.el = templateParser.parse(el)
       }
     } else {
+      this.invalid = true
       _.warn(
-        'v-if ' + this.expression + ' cannot be ' +
+        'v-if="' + this.expression + '" cannot be ' +
         'used on an already mounted instance.'
       )
     }
   },
 
   update: function (value) {
+    if(this.invalid) return
     if (value) {
       if (!this.inserted) {
         if (!this.childVM) {
-          this.build()
+          this.childVM = this.vm.$addChild({
+            el: this.el,
+            parent: this.vm,
+            _anonymous: true
+          })
         }
         this.childVM.$before(this.ref)
         this.inserted = true
@@ -37,14 +43,6 @@ module.exports = {
     }
   },
 
-  build: function () {
-    this.childVM = this.vm._addChild({
-      el: this.el,
-      parent: this.vm,
-      anonymous: true
-    })
-  },
-
   unbind: function () {
     if (this.childVM) {
       this.childVM.$destroy()
@@ -53,6 +51,3 @@ module.exports = {
 
 }
 
-/**
- * v-if绑定的时候在对应的element中打入comment并删除element，更新时重新创建新的element插入。
- */

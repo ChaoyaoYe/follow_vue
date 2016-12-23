@@ -24,6 +24,4 @@ module.exports = {
   }
 
 }
-/**
- * bind->往vm对象的第一个非匿名parent中加入vm对象的引用，将vm和它的parent联系起来
- */
+

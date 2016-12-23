@@ -1,10 +1,29 @@
 var _ = require('./util')
 var Observer = require('./observe/observer')
 var expParser = require('./parse/expression')
+var Binding = require('./binding')
 var Batcher = require('./batcher')
 
 var batcher = new Batcher()
 var uid = 0
+
+/**
+ * Only one watcher will be collecting dependency at
+ * any time
+ */
+
+var activeWatcher = null
+
+/**
+ * Collect dependency for the target directive being
+ * evaluated. This is called on the active watcher's vm
+ *
+ * @param {String} path
+ */
+
+function collectDep(path){
+  activeWatcher.addDep(path)
+}
 
 /**
  * A watcher parses an expression, collects dependencies,
@@ -14,22 +33,20 @@ var uid = 0
  * @param {Vue} vm
  * @param {String} expression
  * @param {Function} cb
- * @param {Object} [ctx]
  * @param {Array} [filters]
  * @param {Boolean} [needSet]
  * @constructor
  */
 
-function Watcher (vm, expression, cb, ctx, filters, needSet) {
+function Watcher (vm, expression, cb, filters, needSet) {
   this.vm = vm
   this.expression = expression
-  this.cb = cb // change callback
-  this.ctx = ctx || vm // change callback context
+  this.cbs = [cb] // change callback
   this.id = ++uid // uid for batching
   this.value = undefined
   this.active = true
-  this.deps = {}
-  this.newDeps = {}
+  this.deps = Object.create(null)
+  this.newDeps = Object.create(null)
   // setup filters if any.
   // We delegate directive filters here to the watcher
   // because they need to be included in the dependency
@@ -92,8 +109,8 @@ p.addDep = function (path) {
     newDeps[path] = true
     if (!oldDeps[path]) {
       var binding =
-        vm._getBindingAt(path) ||
-        vm._createBindingAt(path)
+        vm._bindings[path] ||
+        (vm._bindings[path] = new Binding())
       binding._addSub(this)
     }
   }
@@ -134,7 +151,8 @@ p.set = function (value) {
 
 p.beforeGet = function () {
   Observer.emitGet = true
-  this.vm._activeWatcher = this
+  this.vm.$observer.on('get', collectDep)
+  activeWatcher = this
   this.newDeps = {}
 }
 
@@ -143,8 +161,9 @@ p.beforeGet = function () {
  */
 
 p.afterGet = function () {
-  this.vm._activeWatcher = null
   Observer.emitGet = false
+  this.vm.$observer.off('get')
+  activeWatcher = null
   _.extend(this.newDeps, this.deps)
   this.deps = this.newDeps
 }
@@ -172,8 +191,39 @@ p.run = function () {
     ) {
       var oldValue = this.value
       this.value = value
-      this.cb.call(this.ctx, value, oldValue)
+      var cbs = this.cbs
+      for (var i = 0, l = cbs.length; i < l; i++){
+        cbs[i](value, oldValue)
+      }
     }
+  }
+}
+
+/**
+ * Add a callback
+ *
+ * @param {Function} cb
+ */
+
+p.addCb = function(cb){
+  this.cbs.push(cb)
+}
+
+/**
+ * Remove a callback
+ *
+ * @param {Function} cb
+ */
+
+p.removeCb = function(cb){
+  var cbs = this.cbs
+  if(cbs.length > 1){
+    var i = cbs.indexOf(cb)
+    if(i > -1){
+      cbs.splice(i, 1)
+    }
+  }else if(cb === cbs[0]){
+    this.teardown()
   }
 }
 
@@ -183,11 +233,12 @@ p.run = function () {
 
 p.teardown = function () {
   if (this.active) {
-    this.active = false
     var vm = this.vm
     for (var path in this.deps) {
-      vm._getBindingAt(path)._removeSub(this)
+      vm._bindings[path]._removeSub(this)
     }
+    this.active = false
+    this.vm = this.cbs = this.value = null
   }
 }
 

@@ -14,27 +14,38 @@ function enableDebug () {
   /**
    * Log a message.
    *
-   * @param {*...}
+   * @param {String} msg
    */
 
-  exports.log = function () {
+  exports.log = function (msg) {
     if (hasConsole && config.debug) {
-      console.log.apply(console, arguments)
+      console.log('[Vue info]: '+msg)
     }
   }
 
   /**
    * We've got a problem here.
    *
-   * @param {*...}
+   * @param {String} msg
    */
 
-  exports.warn = function () {
+  exports.warn = function (msg) {
     if (hasConsole && !config.silent) {
-      console.warn.apply(console, arguments)
+      console.warn.apply('[Vue info]: '+msg)
       if (config.debug && console.trace) {
         console.trace()
       }
     }
   }
 }
+
+/**
+   * Assert asset exists
+   */
+
+  exports.assertAsset = function (val, type, id) {
+    if (!val) {
+     exports.warn('Failed to resolve ' + type + ': ' + id)
+    }
+  }
+ }

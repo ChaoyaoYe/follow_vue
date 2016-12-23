@@ -5,33 +5,35 @@ var namespace = {
 }
 
 module.exports = {
+
+  priority: 850,
+
   bind : function () {
-      //check namespace attributes
-      if(this.el.namespaceURI.slice(3) === 'svg') {
-        var name = this.arg
-        var colonIndex = name.indexOf(':')
-        if(colonIndex > 0) {
-          this.localName = name.slice(colonIndex + 1)
-          this.namespace = namespace[name.slice(0, colonIndex)]
-        }
-      }
-  },
-  update : function (value) {
-    var el = this.el
-    var ns = this.namespace
-    var name = this.arg
-    if (value || value === 0) {
-      if(ns) {
-        el.setAttributeNS(ns, name, value)
-      }else {
-        el.setAttribute(ns, name, value)
-      }
-    } else {
-      if(ns){
-        el.removeAttributeNS(ns, this.localName)
+      var colonIndex = name.indexOf(':')
+      // check namespace attributes
+      if(colonIndex > 0){
+        this.localName = name.slice(colonIndex + 1)
+        this.namespace = namespaces[name.slice(0, colonIndex)]
+        this.update = namespaceHandler
       }else{
-        el.removeAttribute(name)
+        this.update = defaultHandler
       }
-    }
+  }
+}
+
+function defaultHandler(value){
+  if(value != null){
+    this.el.setAttribute(this.arg, value)
+  }else{
+    this.el.removeAttribute(this.arg)
+  }
+}
+
+function namespaceHandler(value){
+  var ns = this.namespace
+  if(value != null){
+    this.el.setAttribute(ns, this.arg, value)
+  }else {
+    this.el.removeAttribute(ns, this.localName)
   }
 }

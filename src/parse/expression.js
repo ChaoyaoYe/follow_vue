@@ -184,7 +184,10 @@ function makeGetter (body) {
 
 function makeSetter (body) {
   try {
-    return new Function('scope', 'value', body + ' = value;')
+    return new Function(
+      'scope',
+       'try{return' + body + '}catch(e){};'
+     )
   } catch (e) {
     _.warn('Invalid setter function body: ' + body)
   }

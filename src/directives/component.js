@@ -37,7 +37,7 @@ module.exports = {
       }
     } else {
       _.warn(
-        'v-component ' + this.expression + ' cannot be ' +
+        'v-component=" ' + this.expression + '" cannot be ' +
         'used on an already mounted instance.'
       )
     }
@@ -109,7 +109,8 @@ module.exports = {
       this.Ctor = _.Vue
     } else {
       this.id = id
-      this.Ctor = this.vm._asset('components', id)
+      this.Ctor = this.vm.$options.components[id]
+      _.assertAsset(this.Ctor, 'component', id)
     }
   },
 
@@ -132,8 +133,9 @@ module.exports = {
       }
     }
     if (this.Ctor && !this.childVM) {
-      this.childVM = this.vm_addChild({
+      this.childVM = this.vm.$addChild({
         el: this.el.cloneNode(true),
+        _linker: this._linker,
         parent: this.vm
       }, this.Ctor)
       if(this.keepAlive){

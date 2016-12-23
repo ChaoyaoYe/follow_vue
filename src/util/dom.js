@@ -97,4 +97,26 @@ exports.copyAttributes = function (from, to) {
   }
 }
 
-/** Working on v-repeat */
+/**
+ * Add event listener shorthand.
+ *
+ * @param {Element} el
+ * @param {String} event
+ * @param {Function} cb
+ */
+
+exports.on = function (el, event, cb) {
+  el.addEventListener(event, cb)
+}
+
+/**
+ * Remove event listener shorthand.
+ *
+ * @param {Element} el
+ * @param {String} event
+ * @param {Function} cb
+ */
+
+exports.off = function (el, event, cb) {
+  el.removeEventListener(event, cb)
+ }

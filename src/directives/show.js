@@ -7,6 +7,4 @@ module.exports = function (value) {
   }, this.vm)
 }
 
-/**
- * v-show通过调用element.style.display来设置element的显示和隐藏,并携带切换动画
- */
+

@@ -2,7 +2,16 @@ var _ = require('../util')
 var Emitter = require('../emitter')
 var Observer = require('../observe/observer')
 var scopeEvents = ['set', 'mutate', 'add', 'delete']
-var allEvents = ['get', 'set', 'mutate', 'add', 'delete', 'add:self', 'delete:self']
+var allEvents = [
+  'get',
+  'set',
+  'mutate',
+  'add',
+  'delete',
+  'add:self',
+  'delete:self'
+]
+var proxyEvents = dataEvents.slice(0, 5)
 
 /**
  * Setup the data scope of an instance.
@@ -18,16 +27,11 @@ var allEvents = ['get', 'set', 'mutate', 'add', 'delete', 'add:self', 'delete:se
  */
 
 exports._initScope = function () {
-  this._children = null
-  this._childCtors = null
   this._initObserver()
   this._initData()
   this._initComputed()
   this._initMethods()
-  // listen to parent scope events
-  if (this.$parent && !this.$options.isolated) {
-    this._linkScope()
-  }
+  this._initMeta()
 }
 
 /**
@@ -40,18 +44,16 @@ exports._teardownScope = function () {
   // stop relaying data events
   var dataOb = this._data.__ob__
   var proxies = this._dataProxies
-  var i = allEvents.length
+  var i = dataEvents.length
   var event
   while (i--) {
-    event = allEvents[i]
+    event = dataEvents[i]
     dataOb.off(event, proxies[event])
   }
+  dataOb.vmOwnerCount--
+  dataOb.tryRealease()
   // unset data reference
-  this._data = null
-  // stop propagating parent scope changes
-  if (this._scopeListeners) {
-    this._unlinkScope()
-  }
+  this._data = this._dataProxies = null
 }
 
 /**
@@ -63,16 +65,16 @@ exports._initObserver = function () {
   var ob = this.$observer = new Emitter(this)
   // setup data proxy handlers
   var proxies = this._dataProxies = {}
-  allEvents.forEach(function (event) {
-    proxies[event] = function (a, b, c) {
+  proxyEvents.forEach(function (event) {
+    proxies[event] = function dataProxyFn (a, b, c) {
       ob.emit(event, a, b, c)
     }
   })
   var self = this
-  proxies['add:self'] = function (key) {
+  proxies['add:self'] = function dataProxyFn(key) {
     self._proxy(key)
   }
-  proxies['delete:self'] = function (key) {
+  proxies['delete:self'] = function dataProxyFn(key) {
     self._unproxy(key)
   }
 }
@@ -91,51 +93,14 @@ exports._initData = function () {
   }
   // relay data changes
   var ob = Observer.create(data)
+  ob.vmOwnerCount++
   var proxies = this._dataProxies
   var event
-  i = allEvents.length
+  i = dataEvents.length
   while (i--) {
-    event = allEvents[i]
+    event = dataEvents[i]
     ob.on(event, proxies[event])
   }
-}
-
-/**
- * Listen to parent scope's events
- */
-
-exports._linkScope = function () {
-  var self = this
-  var ob = this.$observer
-  var pob = this.$parent.$observer
-  var listeners = this._scopeListeners = {}
-  scopeEvents.forEach(function (event) {
-    var cb = listeners[event] = function (key, a, b) {
-      // since these events come from upstream,
-      // we only emit them if we don't have the same keys
-      // shadowing them in current scope.
-      if (!self.hasOwnProperty(key)) {
-        ob.emit(event, key, a, b, true)
-      }
-    }
-    pob.on(event, cb)
-  })
-}
-
-/**
- * Stop listening to parent scope events
- */
-
-exports._unlinkScope = function () {
-  var pob = this.$parent.$observer
-  var listeners = this._scopeListeners
-  var i = scopeEvents.length
-  var event
-  while (i--) {
-    event = scopeEvents[i]
-    pob.off(event, listeners[event])
-  }
-  this._scopeListeners = null
 }
 
 /**
@@ -181,13 +146,17 @@ exports._setData = function (newData) {
   var oldOb = oldData.__ob__
   var proxies = this._dataProxies
   var event, proxy
-  i = allEvents.length
+  i = dataEvents.length
   while (i--) {
-    event = allEvents[i]
+    event = dataEvents[i]
     proxy = proxies[event]
     newOb.on(event, proxy)
     oldOb.off(event, proxy)
   }
+  newOb.vmOwnerCount++
+  oldOb.vmOwnerCount--
+  // memory managment, important!
+  oldOb.tryRelease()
 }
 
 /**
@@ -199,14 +168,17 @@ exports._setData = function (newData) {
 
 exports._proxy = function (key) {
   if (!_.isReserved(key)) {
+    // need to store ref to self here
+    // because these getter/setter might
+    // be called by child instances!
     var self = this
     Object.defineProperty(self, key, {
       configurable: true,
       enumerable: true,
-      get: function () {
+      get: function proxyGetter () {
         return self._data[key]
       },
-      set: function (val) {
+      set: function proxySetter (val) {
         self._data[key] = val
       }
     })
@@ -270,44 +242,16 @@ exports._initMethods = function () {
 }
 
 /**
- * Create a child instance that prototypally inehrits
- * data on parent. To achieve that we create an intermediate
- * constructor with its prototype pointing to parent.
- *
- * @param {Object} opts
- * @param {Function} [BaseCtor]
+ * Initialize meta information like $index, $key & $value
  */
 
-exports._addChild = function (opts, BaseCtor) {
-  BaseCtor = BaseCtor || _.Vue
-  var ChildVue
-  if (BaseCtor.options.isolated) {
-    ChildVue = BaseCtor
-  } else {
-    var parent = this
-    var ctors = parent._childCtors
-    if (!ctors) {
-      ctors = parent._childCtors = {}
-    }
-    ChildVue = ctors[BaseCtor.cid]
-    if (!ChildVue) {
-      ChildVue = function (options) {
-        this.$parent = parent
-        this.$root = parent.$root || parent
-        this.constructor = ChildVue
-        _.Vue.call(this, options)
-      }
-      ChildVue.options = BaseCtor.options
-      ChildVue.prototype = this
-      ctors[BaseCtor.cid] = ChildVue
+exports._initMeta = function(){
+  var metas = this.$options._meta
+  if(metas){
+    for(var key in metas) {
+      this._defineMeta(key, meta[key])
     }
   }
-  var child = new ChildVue(opts)
-  if (!this._children) {
-    this._children = []
-  }
-  this._children.push(child)
-  return child
 }
 
 /**
@@ -323,13 +267,13 @@ exports._defineMeta = function (key, value) {
   Object.defineProperty(this, key, {
     enumerable: true,
     configurable: true,
-    get: function () {
+    get: function metaGetter () {
       if (Observer.emitGet) {
         ob.emit('get', key)
       }
       return value
     },
-    set: function (val) {
+    set: function metaSetter (val) {
       if (val !== value) {
         value = val
         ob.emit('set', key, val)

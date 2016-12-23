@@ -16,36 +16,42 @@ exports._init = function (options) {
   options = options || {}
 
   this.$el          = null
-  this._data        = options.data || {}
   this.$            = {}
   this.$root        = this.$root || this
-  this._rawContent  = null
   this._emitter     = new Emitter(this)
-  this._watchers    = {}
-  this._activeWatcher = null
+  this._watchers    = Object.create(null)
+  this._userWathers = Object.create(null)
+  this._bindings = Object.create(null)
   this._directives  = []
 
   // block instance properties
-  this._isBlock = false
-  this.blockStart = null
+  this._blockStart =
   this.blockEnd = null
+  this._isBlock = false
 
   // lifecycle state
-  this._isCompiled = false
-  this._isDestroyed = false
-  this._isReady = false
+  this._isCompiled =
+  this._isDestroyed =
+  this._isReady =
   this._isAttached = false
+
+  // children
+  this._children =
+  this._childCtors = null
 
   // anonymous instances are created by flow-control
   // directives such as v-if and v-repeat
-  this._isAnonymous = options.anonymous
+  this._isAnonymous = options._anonymous
 
   // merge options.
-  this.$options = mergeOptions(
+  options = mergeOptions(
     this.constructor.options,
     options,
     this
   )
+
+  // set data after merge
+  this._data = options.data || {}
 
   // the `created` hook is called after basic properties have
   // been set up & before data observation happens.
@@ -55,7 +61,7 @@ exports._init = function (options) {
   this._initScope()
 
   // setup binding tree.
-  // @creates this._rootBinding
+  // @creates this._bindings
   this._initBindings()
 
   // setup event system and option events

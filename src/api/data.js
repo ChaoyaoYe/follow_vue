@@ -64,35 +64,34 @@ exports.$delete = function (key) {
 
 /**
  * Watch an expression, trigger callback when its
- * value changes. Returns the created watcher's
- * id so it can be teardown later.
+ * value changes.
  *
  * @param {String} exp
  * @param {Function} cb
  * @param {Boolean} [immediate]
- * @return {Number}
+ * @return {Function} - unwatchFn
  */
 
 exports.$watch = function (exp, cb, immediate) {
-  var watcher = new Watcher(this, exp, cb, this)
-  this._watchers[watcher.id] = watcher
-  if(immediate) {
-    cb.call(this, watcher.value)
+  var vm = this
+  var watcher = vm._userWathers[exp]
+  var wrappedCb = function(val, oldVal){
+    cb.call(vm, val, oldVal)
   }
-  return watcher.id
-}
-
-/**
- * Teardown a watcher with given id.
- *
- * @param {Number} id
- */
-
-exports.$unwatch = function (id) {
-  var watcher = this._watchers[id]
-  if (watcher) {
-    watcher.teardown()
-    this._watchers[id] = null
+  if(!watcher) {
+    watcher = vm._userWathers[exp] =
+      new Watcher(vm, exp, wrappedCb)
+  }else {
+    watcher.addCb(wrappedCb)
+  }
+  if(immediate) {
+    wrappedCb(watcher.value)
+  }
+  return function unwatchFn(){
+    watcer.removeCb(wrappedCb)
+    if(!watcher.active){
+      vm._userWathers[exp] = null
+    }
   }
 }
 

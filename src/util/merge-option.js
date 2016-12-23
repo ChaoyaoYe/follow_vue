@@ -1,5 +1,4 @@
-// alias debug as _ so we can drop _.warn during uglification
-var _ = require('./index')// karma commonjs bridge cannot handle ./
+var _ = require('./index')
 var extend = _.extend
 
 /**
@@ -17,6 +16,34 @@ var extend = _.extend
 var strats = {}
 
 /**
+ * Data
+ */
+
+strats.data = function (parentVal, childVal, vm) {
+  if (!childVal) return parentVal
+  if (!parentVal || !vm) {
+    return childVal
+  }
+  // instance option is a function, just call it here.
+  if (typeof childVal === 'function') {
+    childVal = childVal()
+  }
+  // the special case where parent data is a function,
+  // and instance also has passed-in data. we need to mix
+  // the default data returned from the function into the
+  // passed-in one.
+  if (typeof parentVal === 'function') {
+    var defaultData = parentVal()
+    for (var key in defaultData) {
+      if (!childVal.hasOwnProperty(key)) {
+        childVal[key] = defaultData[key]
+      }
+    }
+  }
+  return childVal
+}
+
+/**
  * Hooks and param attributes are merged as arrays.
  */
 
@@ -25,33 +52,43 @@ strats.ready =
 strats.attached =
 strats.detached =
 strats.beforeCompile =
-this.compiled =
+strats.compiled =
 strats.beforeDestroy =
 strats.destroyed =
 strats.paramAttributes = function (parentVal, childVal) {
-  return (parentVal || []).concat(childVal || [])
+  return childVal
+    ? parentVal
+      ? parentVal.concat(childVal)
+      : [childVal]
+    : parentVal
 }
 
 /**
  * Assets
  *
- * When a vm is present (instance creation), we skip the
- * merge here because it is faster to resolve assets
- * dynamically only when needed
+ * When a vm is present (instance creation), we need to do
+ * a three-way merge between constructor options, instance
+ * options and parent options.
  */
 
 strats.directives =
 strats.filters =
 strats.partials =
 strats.transitions =
-strats.components = function (parentVal, childVal, vm) {
-  if(vm) {
-    return childVal
-  } else {
-    var ret = Object.create(parentVal || null)
-    extend(ret, childVal)
-    return ret
+strats.components = function (parentVal, childVal, vm, key) {
+  var ret = Object.create(parentVal || null)
+  if(childVal) extend(ret, childVal)
+  if (vm && vm.$parent) {
+    var scopeVal = vm.$parent.$options[key]
+    var keys = Object.keys(scopeVal)
+    var i = keys.length
+    var field
+    while (i--) {
+      field = keys[i]
+      ret[field] = scopeVal[field]
+    }
   }
+  return ret
 }
 
 /**
@@ -62,6 +99,8 @@ strats.components = function (parentVal, childVal, vm) {
  */
 
 strats.events = function (parentVal, childVal) {
+  if (!childVal) return parentVal
+  if (!parentVal) return childVal
   var ret = {}
   extend(ret, parentVal)
   for (var key in childVal) {
@@ -80,18 +119,15 @@ strats.events = function (parentVal, childVal) {
 
 strats.methods =
 strats.computed = function (parentVal, childVal) {
-  var ret = Object.create(parentVal || null)
+  if (!childVal) return parentVal
+  if (!parentVal) return childVal
+  var ret = Object.create(parentVal)
   extend(ret, childVal)
   return ret
 }
 
 /**
  * Default strategy.
- * Applies to:
- * - data
- * - el
- * - parent
- * - replace
  */
 
 var defaultStrat = function (parentVal, childVal) {
@@ -112,7 +148,7 @@ function guardComponents (components) {
     var def
     for (var key in components) {
       def = components[key]
-      if (_.isObject(def)) {
+      if (_.isPlainObject(def)) {
         components[key] = _.Vue.extend(def)
       }
     }
@@ -129,7 +165,7 @@ function guardComponents (components) {
  *                     an instantiation merge.
  */
 
-module.exports = function mergeOptions(parent, child, vm) {
+module.exports = function mergeOptions (parent, child, vm) {
   guardComponents(child.components)
   var options = {}
   var key
@@ -142,15 +178,19 @@ module.exports = function mergeOptions(parent, child, vm) {
     }
   }
   function merge (key) {
-    if (!vm && (key === 'el' || key === 'data' || key === 'parent')) {
+    if (
+      !vm &&
+      (key === 'el' || key === 'data') &&
+      typeof child[key] !== 'function') {
       _.warn(
-        'The "' + key + '" option can only be used as an instantiation ' +
-        'option and will be ignored in Vue.extend().'
+        'The "' + key + '" option should be a function ' +
+        'that returns a per-instance value in component ' +
+        'definitions.'
       )
-      return
+    } else {
+      var strat = strats[key] || defaultStrat
+      options[key] = strat(parent[key], child[key], vm, key)
     }
-    var strat = strats[key] || defaultStrat
-    options[key] = strat(parent[key], child[key], vm)
   }
   return options
 }

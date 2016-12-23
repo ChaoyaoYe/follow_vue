@@ -2,21 +2,6 @@ var _ = require('../util')
 var transition = require('../transition')
 
 /**
- * Check if a node is in the document.
- *
- * @param {Node} node
- * @return {Boolean}
- */
-
-var doc =
-  typeof document !== 'undefined' &&
-  document.documentElement
-
-exports.inDoc = function (node) {
-  return doc && doc.contains(node)
-}
-
-/**
  * Append instance to target
  *
  * @param {Node} target
@@ -88,13 +73,15 @@ exports.$after = function (target, cb, withTransition) {
  */
 
 exports.$remove = function (cb, withTransition) {
+  var canRemove = this._isAttached && _.inDoc(this.$el)
+  if (!canRemove) {
+    if (cb) cb()
+    return
+  }
   var op
-  var shouldCallHook = this._isAttached && _.inDoc(this.$el)
   var self = this
   var realCb = function () {
-    if (shouldCallHook) {
-      self._callHook('detached')
-    }
+    self._callHook('detached')
     if (cb) cb()
   }
   if (
@@ -105,7 +92,7 @@ exports.$remove = function (cb, withTransition) {
       ? _.append
       : transition.removeThenAppend
     blockOp(this, this._blockFragment, op, realCb)
-  } else if (this.$el.parentNode) {
+  } else {
     op = withTransition === false
       ? _.remove
       : transition.remove
