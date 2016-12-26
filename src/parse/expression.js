@@ -157,7 +157,7 @@ function makeGetter (body) {
     )
   } catch (e) {
     _.warn(
-      'Invalid expression. ' +
+      'Invalid expression. ' + 
       'Generated function body: ' + body
     )
   }
@@ -182,7 +182,7 @@ function makeSetter (body) {
     return new Function(
       'scope',
       'value',
-      '"use strict";'+ body + ' = value;'
+      '"use strict";' + body + ' = value;'
     )
   } catch (e) {
     _.warn('Invalid setter function body: ' + body)

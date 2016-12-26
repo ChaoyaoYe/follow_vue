@@ -32,7 +32,7 @@ describe('Instance Scope', function () {
   })
 
   describe('computed', function () {
-
+    
     var vm = new Vue({
       data: {
         a: 'a',

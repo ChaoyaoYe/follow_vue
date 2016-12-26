@@ -174,9 +174,9 @@ p.removeCb = function (cb) {
 
 p.teardown = function () {
   if (this.active) {
+    var list = this.vm._watcherList
+    list.splice(list.indexOf(this))
     for (var id in this.deps) {
-      var list = this.vm._watcherList
-      list.splice(list.indexOf(this))
       this.deps[id].removeSub(this)
     }
     this.active = false

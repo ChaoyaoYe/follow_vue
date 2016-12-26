@@ -50,7 +50,7 @@ var p = Directive.prototype
  */
 
 p._bind = function (def) {
-  if(typeof def === 'function'){
+  if (typeof def === 'function') {
     this.update = def
   } else {
     _.extend(this, def)
@@ -66,20 +66,20 @@ p._bind = function (def) {
     !this._checkExpFn()
   ) {
     // use raw expression as identifier because filters
-    // make them different watcher
+    // make them different watchers
     var watcher = this.vm._watchers[this.raw]
     // wrapped updater for context
     var dir = this
-    var update = this._udpate = function(val, oldVal){
-      if(!dir._locked){
+    var update = this._update = function (val, oldVal) {
+      if (!dir._locked) {
         dir.update(val, oldVal)
       }
     }
-    if(!watcher){
+    if (!watcher) {
       watcher = this.vm._watchers[this.raw] = new Watcher(
         this.vm,
         this._watcherExp,
-        updata,
+        update, // callback
         this.filters,
         this.twoWay // need setter
       )
@@ -147,9 +147,9 @@ p._teardown = function () {
       this.unbind()
     }
     var watcher = this._watcher
-    if(watcher && watcher.active){
+    if (watcher && watcher.active) {
       watcher.removeCb(this._update)
-      if(!watcher.active){
+      if (!watcher.active) {
         this.vm._watchers[this.expression] = null
       }
     }
@@ -177,7 +177,7 @@ p.set = function (value, lock) {
     if (lock) {
       var self = this
       _.nextTick(function () {
-        self._locked = false
+        self._locked = false        
       })
     }
   }

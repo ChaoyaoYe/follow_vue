@@ -1,30 +1,34 @@
 var config = require('../config')
 
 /**
+ * Check if a node is in the document.
+ *
+ * @param {Node} node
+ * @return {Boolean}
+ */
+
+var doc =
+  typeof document !== 'undefined' &&
+  document.documentElement
+
+exports.inDoc = function (node) {
+  return doc && doc.contains(node)
+}
+
+/**
  * Extract an attribute from a node.
  *
  * @param {Node} node
  * @param {String} attr
  */
 
-exports.attr = function(node, attr){
+exports.attr = function (node, attr) {
   attr = config.prefix + attr
   var val = node.getAttribute(attr)
-  if(val !== null){
+  if (val !== null) {
     node.removeAttribute(attr)
   }
   return val
-}
-
-/**
- * Insert el before target
- *
- * @param {Element} el
- * @param {Element} target
- */
-
-exports.before = function (el, target) {
-  target.parentNode.insertBefore(el, target)
 }
 
 /**
@@ -34,15 +38,26 @@ exports.before = function (el, target) {
  * @param {Element} target
  */
 
-exports.append = function(el, target) {
+exports.append = function (el, target) {
   target.appendChild(el)
+}
+
+/**
+ * Insert el before target
+ *
+ * @param {Element} el
+ * @param {Element} target 
+ */
+
+exports.before = function (el, target) {
+  target.parentNode.insertBefore(el, target)
 }
 
 /**
  * Insert el after target
  *
  * @param {Element} el
- * @param {Element} target
+ * @param {Element} target 
  */
 
 exports.after = function (el, target) {
@@ -67,7 +82,7 @@ exports.remove = function (el) {
  * Prepend el to target
  *
  * @param {Element} el
- * @param {Element} target
+ * @param {Element} target 
  */
 
 exports.prepend = function (el, target) {
@@ -85,7 +100,7 @@ exports.prepend = function (el, target) {
  * @param {Element} el
  */
 
-exports.replace = function(target, el){
+exports.replace = function (target, el) {
   var parent = target.parentNode
   parent.insertBefore(el, target)
   parent.removeChild(target)
@@ -130,4 +145,4 @@ exports.on = function (el, event, cb) {
 
 exports.off = function (el, event, cb) {
   el.removeEventListener(event, cb)
- }
+}

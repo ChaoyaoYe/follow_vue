@@ -50,6 +50,7 @@ exports.remove = function (el, cb, vm) {
 }
 
 /**
+ * Remove by appending to another parent with transition.
  * This is only used in block operations.
  *
  * @oaram {Element} el

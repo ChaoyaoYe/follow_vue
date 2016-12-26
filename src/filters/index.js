@@ -6,7 +6,7 @@ var _ = require('../util')
  * @param {Number} indent
  */
 
-exports.json = function(value, indent){
+exports.json = function (value, indent) {
   return JSON.stringify(value, null, Number(indent) || 2)
 }
 
@@ -78,7 +78,7 @@ exports.pluralize = function (value) {
   var args = _.toArray(arguments, 1)
   return args.length > 1
     ? (args[value % 10 - 1] || args[args.length - 1])
-    : (args[0] + (value === 1) ? '' : 's')
+    : (args[0] + (value === 1 ? '' : 's'))
 }
 
 /**

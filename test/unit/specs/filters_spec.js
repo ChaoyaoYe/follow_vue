@@ -9,7 +9,7 @@ describe('Filters', function () {
     expect(filter(obj)).toBe(JSON.stringify(obj, null, 2))
     expect(filter(obj, 4)).toBe(JSON.stringify(obj, null, 4))
   })
-
+  
   it('capitalize', function () {
     var filter = filters.capitalize
     var res = filter('fsefsfsef')

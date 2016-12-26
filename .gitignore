@@ -3,5 +3,5 @@ test/unit/specs.js
 explorations
 node_modules
 .DS_Store
-benchmarks/borwser.js
+benchmarks/browser.js
 coverage

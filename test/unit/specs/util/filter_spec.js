@@ -1,7 +1,7 @@
 var _ = require('../../../../src/util')
 
 describe('Util - Filter', function () {
-
+  
   it('resolveFilters', function () {
     var filters = [
       { name: 'a', args: ['a'] },
@@ -9,7 +9,7 @@ describe('Util - Filter', function () {
       { name: 'c' }
     ]
     var vm = {
-      _asset: function(type, id){
+      _asset: function (type, id) {
         return this.$options[type][id]
       },
       $options: {
@@ -44,12 +44,11 @@ describe('Util - Filter', function () {
     expect(readB.id).toBe('b')
     expect(readB.value).toBe(2)
     expect(readB.arg).toBe('b')
-
+    
     var writeB = res.write[0](3)
     expect(writeB.id).toBe('bw')
     expect(writeB.value).toBe(3)
     expect(writeB.arg).toBe('b')
-
   })
 
   it('applyFilters', function () {

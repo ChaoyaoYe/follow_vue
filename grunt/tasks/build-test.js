@@ -12,4 +12,4 @@ module.exports = function (grunt) {
       .pipe(fs.createWriteStream('test/unit/specs.js'))
       .on('close', done)
   })
-} 
+}

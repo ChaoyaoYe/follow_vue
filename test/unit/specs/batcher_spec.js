@@ -9,7 +9,7 @@ describe('Batcher', function () {
   beforeEach(function () {
     spy = jasmine.createSpy('batcher')
   })
-
+  
   it('push', function (done) {
     batcher.push({
       run: spy
@@ -47,18 +47,19 @@ describe('Batcher', function () {
       override: true
     })
     nextTick(function () {
-      expect(spy).toHaveBeenCalled()
+      expect(spy).not.toHaveBeenCalled()
       expect(spy2.calls.count()).toBe(1)
       done()
     })
   })
 
-  it('preFlush hook', function(done){
+  it('preFlush hook', function (done) {
     batcher._preFlush = spy
-    batcher.push({ run: function(){}})
-    nextTick(function(){
+    batcher.push({ run: function () {}})
+    nextTick(function () {
       expect(spy.calls.count()).toBe(1)
       done()
     })
   })
+
 })

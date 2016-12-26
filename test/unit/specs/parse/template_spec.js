@@ -6,7 +6,7 @@ var testString = '<div>hello</div><p class="test">world</p>'
 if (_.inBrowser) {
 
   describe('Template Parser', function () {
-
+    
     it('should return same if argument is already a fragment', function () {
       var frag = document.createDocumentFragment()
       var res = parse(frag)
@@ -16,7 +16,7 @@ if (_.inBrowser) {
     it('should return content if argument is a valid template node', function () {
       var templateNode = document.createElement('template')
       if (!templateNode.content) {
-        // mock the content
+        // mock the content 
         templateNode.content = document.createDocumentFragment()
       }
       var res = parse(templateNode)

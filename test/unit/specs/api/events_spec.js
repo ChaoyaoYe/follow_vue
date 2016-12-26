@@ -7,7 +7,7 @@ describe('Events API', function () {
     vm = new Vue()
     spy = jasmine.createSpy('emitter')
   })
-
+  
   it('$on', function () {
     vm.$on('test', function () {
       // expect correct context
@@ -33,7 +33,7 @@ describe('Events API', function () {
     vm.$off()
     vm.$emit('test1')
     vm.$emit('test2')
-    expect(spy).toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('$off event', function () {
@@ -53,7 +53,7 @@ describe('Events API', function () {
     vm.$on('test', spy2)
     vm.$off('test', spy)
     vm.$emit('test', 1, 2, 3)
-    expect(spy).toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
     expect(spy2.calls.count()).toBe(1)
     expect(spy2).toHaveBeenCalledWith(1, 2, 3)
   })
@@ -73,10 +73,10 @@ describe('Events API', function () {
     var child = vm.$addChild()
     var child2 = child.$addChild()
     // hooks should not incurr the bookkeeping cost
-    child.$on('hook:created', function(){})
-    expect(vm._eventCount['hook:created']).toBeUndefined()
+    child.$on('hook:created', function () {})
+    expect(vm._eventsCount['hook:created']).toBeUndefined()
     child.$on('test', spy)
-    expect(vm._eventCount['test']).toBe(1)
+    expect(vm._eventsCount['test']).toBe(1)
     // child2's $emit & $broadcast
     // shouldn't get called if no child listens to the event
     child2.$emit = spy
@@ -93,7 +93,7 @@ describe('Events API', function () {
     })
     child2.$on('test', spy)
     vm.$broadcast('test')
-    expect(spy).toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
   })
 
   it('$dispatch', function () {
@@ -113,7 +113,7 @@ describe('Events API', function () {
     })
     vm.$on('test', spy)
     child2.$dispatch('test')
-    expect(spy).toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
   })
 
 })

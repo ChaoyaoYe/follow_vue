@@ -37,33 +37,31 @@ exports.$set = function (exp, val) {
 
 /**
  * Add a property on the VM
- * (and also on $scope and $data)
  *
  * @param {String} key
  * @param {*} val
  */
 
 exports.$add = function (key, val) {
-  if(!_.isReserved(key)){
+  if (!_.isReserved(key)) {
     this._data.$add(key, val)
     this._proxy(key)
     this._digest()
-  }else{
+  } else {
     _.warn('Refused to $add reserved key: ' + key)
   }
 }
 
 /**
  * Delete a property on the VM
- * (and also on $scope and $data)
  *
  * @param {String} key
  */
 
 exports.$delete = function (key) {
-  if(!_.isReserved(key)){
+  if (!_.isReserved(key)) {
     this._data.$delete(key)
-    this.unproxy(key)
+    this._unproxy(key)
     this._digest()
   } else {
     _.warn('Refused to $delete reserved key: ' + key)
@@ -82,23 +80,23 @@ exports.$delete = function (key) {
 
 exports.$watch = function (exp, cb, immediate) {
   var vm = this
-  var watcher = vm._userWathers[exp]
-  var wrappedCb = function(val, oldVal){
+  var watcher = vm._userWatchers[exp]
+  var wrappedCb = function (val, oldVal) {
     cb.call(vm, val, oldVal)
   }
-  if(!watcher) {
-    watcher = vm._userWathers[exp] =
+  if (!watcher) {
+    watcher = vm._userWatchers[exp] =
       new Watcher(vm, exp, wrappedCb)
-  }else {
+  } else {
     watcher.addCb(wrappedCb)
   }
-  if(immediate) {
+  if (immediate) {
     wrappedCb(watcher.value)
   }
-  return function unwatchFn(){
-    watcer.removeCb(wrappedCb)
-    if(!watcher.active){
-      vm._userWathers[exp] = null
+  return function unwatchFn () {
+    watcher.removeCb(wrappedCb)
+    if (!watcher.active) {
+      vm._userWatchers[exp] = null
     }
   }
 }

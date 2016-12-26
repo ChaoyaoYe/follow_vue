@@ -14,7 +14,7 @@ module.exports = function (el, direction, op, data, def) {
     data.cancel = null
   }
   if (direction > 0) { // enter
-    if(def.beforeEnter){
+    if (def.beforeEnter) {
       def.beforeEnter(el)
     }
     op()

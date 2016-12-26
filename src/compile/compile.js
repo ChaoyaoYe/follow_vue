@@ -299,10 +299,10 @@ function compileParamAttributes (el, attrs, options) {
       if (tokens) {
         if (tokens.length > 1) {
           _.warn(
-            'Invalid param binding: "' +
+            'Invalid param attribute binding: "' +
             name + '="' + value + '"' +
             '\nDon\'t mix binding tags with plain text ' +
-            'in param bindings.'
+            'in param attribute bindings.'
           )
         } else {
           param.dynamic = true

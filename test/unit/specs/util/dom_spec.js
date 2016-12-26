@@ -14,7 +14,7 @@ if (_.inBrowser) {
       parent = div()
       child = div()
       target = div()
-      parent.appendChild(child)
+      parent.appendChild(child) 
     })
 
     it('inDoc', function () {
@@ -31,7 +31,7 @@ if (_.inBrowser) {
       expect(val).toBe('ok')
       expect(target.hasAttribute('v-test')).toBe(false)
     })
-
+    
     it('before', function () {
       _.before(target, child)
       expect(target.parentNode).toBe(parent)
@@ -58,7 +58,7 @@ if (_.inBrowser) {
       expect(parent.childNodes.length).toBe(0)
     })
 
-    it('append', function(){
+    it('append', function () {
       _.append(target, parent)
       expect(target.parentNode).toBe(parent)
       expect(parent.lastChild).toBe(target)
@@ -106,5 +106,3 @@ if (_.inBrowser) {
     })
   })
 }
-
-    Contact GitHub API Training Shop Blog About

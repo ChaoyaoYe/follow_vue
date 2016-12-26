@@ -13,10 +13,10 @@ module.exports = {
       return
     }
     partial = templateParser.parse(partial, true)
+    var el = this.el
+    var vm = this.vm
     // comment ref node means inline partial
-    if (el.nodeType === 8) { //comment
-      var el = this.el
-      var vm = this.vm
+    if (el.nodeType === 8) {
       // keep a ref for the partial's content nodes
       var nodes = _.toArray(partial.childNodes)
       _.replace(el, partial)
@@ -34,7 +34,3 @@ module.exports = {
   }
 
 }
-
-/**
- * working on v-repeat
- */

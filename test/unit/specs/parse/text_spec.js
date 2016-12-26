@@ -42,7 +42,7 @@ var testCases = [
       { value: ' and ' },
       { tag: true, value: 'hello', html: false, oneTime: false, partial: true }
     ]
-   }
+  }
 ]
 
 function assertParse (test) {
@@ -86,7 +86,7 @@ describe('Text Parser', function () {
     config.delimiters = ['{{', '}}']
   })
 
-  it('tokens to expression', function(){
+  it('tokens to expression', function () {
     var tokens = textParser.parse('view-{{test}}-test-{{ok}}')
     var exp = textParser.tokensToExp(tokens)
     expect(exp).toBe('"view-"+test+"-test-"+ok')

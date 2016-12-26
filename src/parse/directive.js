@@ -1,7 +1,7 @@
 var _ = require('../util')
 var Cache = require('../cache')
 var cache = new Cache(1000)
-var argRE =  /^[\w\$-]+$|^'[^']*'$|^"[^"]*"$/
+var argRE = /^[\w\$-]+$|^'[^']*'$|^"[^"]*"$/
 var filterTokenRE = /[^\s'"]+|'[^']+'|"[^"]+"/g
 
 /**
@@ -58,8 +58,19 @@ function pushFilter () {
 }
 
 /**
- * Parse a directive string into an Array of AST-like objects
- * representing directives.
+ * Parse a directive string into an Array of AST-like
+ * objects representing directives.
+ *
+ * Example:
+ *
+ * "click: a = a + 1 | uppercase" will yield:
+ * {
+ *   arg: 'click',
+ *   expression: 'a = a + 1',
+ *   filters: [
+ *     { name: 'uppercase', args: null }
+ *   ]
+ * }
  *
  * @param {String} str
  * @return {Array<Object>}
@@ -75,7 +86,8 @@ exports.parse = function (s) {
   // reset parser state
   str = s
   inSingle = inDouble = false
-  curly = square = paren = begin = argIndex = lastFilterIndex = 0
+  curly = square = paren = begin = argIndex = 0
+  lastFilterIndex = 0
   dirs = []
   dir = {}
   arg = null
@@ -84,28 +96,35 @@ exports.parse = function (s) {
     c = str.charCodeAt(i)
     if (inSingle) {
       // check single quote
-      if (c === 0x27) inSingle = !inSingle // '
+      if (c === 0x27) inSingle = !inSingle
     } else if (inDouble) {
       // check double quote
-      if (c === 0x22) inDouble = !inDouble //"
-    } else if (c === 0x2C && !paren && !curly && !square) { //,
+      if (c === 0x22) inDouble = !inDouble
+    } else if (
+      c === 0x2C && // comma
+      !paren && !curly && !square
+    ) {
       // reached the end of a directive
       pushDir()
       // reset & skip the comma
       dir = {}
       begin = argIndex = lastFilterIndex = i + 1
-    } else if (c === 0x3A && !dir.expression && !dir.arg) { //:
+    } else if (
+      c === 0x3A && // colon
+      !dir.expression &&
+      !dir.arg
+    ) {
       // argument
       arg = str.slice(begin, i).trim()
+      // test for valid argument here
+      // since we may have caught stuff like first half of
+      // an object literal or a ternary expression.
       if (argRE.test(arg)) {
-        // test for valid argument here
-        //since we may have caught stuff like first half of
-        // an Object literal or a ternary expression
         argIndex = i + 1
         dir.arg = _.stripQuotes(arg) || arg
       }
     } else if (
-      c === 0x7C && //|
+      c === 0x7C && // pipe
       str.charCodeAt(i + 1) !== 0x7C &&
       str.charCodeAt(i - 1) !== 0x7C
     ) {

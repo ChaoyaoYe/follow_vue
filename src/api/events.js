@@ -12,7 +12,7 @@ exports.$on = function (event, fn) {
   (this._events[event] || (this._events[event] = []))
     .push(fn)
   // hooks do not get broadcasted so we can skip them
-  if(hookRE.test(event)) return
+  if (hookRE.test(event)) return
   // increment all parent event count by 1.
   // pay a small cost here to optimize for $broadcast.
   var parent = this.$parent
@@ -119,7 +119,7 @@ exports.$broadcast = function (event) {
     for (var i = 0, l = children.length; i < l; i++) {
       var child = children[i]
       child.$emit.apply(child, arguments)
-      if(!child._eventCancelled){
+      if (!child._eventCancelled) {
         child.$broadcast.apply(child, arguments)
       }
     }

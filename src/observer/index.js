@@ -147,11 +147,11 @@ p.convert = function (key, val) {
         // swap binding, then call notify on old binding.
         // this ensures all subscribers of the old binding
         // gets re-evaluated, picks up the new binding and
-        // unregister from old binding
+        // unregister from old binding.
         var oldBinding = binding
         binding = newBinding
         oldBinding.notify()
-      }else{
+      } else {
         binding.notify()
       }
     }

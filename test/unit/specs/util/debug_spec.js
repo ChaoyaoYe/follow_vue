@@ -15,7 +15,7 @@ if (typeof console !== 'undefined') {
         spyOn(console, 'trace')
       }
     })
-
+    
     it('log when debug is true', function () {
       config.debug = true
       _.log('hello')
@@ -25,7 +25,7 @@ if (typeof console !== 'undefined') {
     it('not log when debug is false', function () {
       config.debug = false
       _.log('bye')
-      expect(spy).toHaveBeenCalled()
+      expect(console.log).not.toHaveBeenCalled()
     })
 
     it('warn when silent is false', function () {
@@ -37,7 +37,7 @@ if (typeof console !== 'undefined') {
     it('not warn when silent is ture', function () {
       config.silent = true
       _.warn('oops')
-      expect(spy).toHaveBeenCalled()
+      expect(console.warn).not.toHaveBeenCalled()
     })
 
     if (console.trace) {

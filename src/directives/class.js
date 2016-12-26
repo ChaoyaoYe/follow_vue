@@ -1,4 +1,3 @@
-var _ = require('../util')
 var hasClassList =
   typeof document !== 'undefined' &&
   'classList' in document.documentElement
@@ -55,7 +54,3 @@ module.exports = function (value) {
     }
   }
 }
-
-/**
- * 往element中添加或是删除class
- */

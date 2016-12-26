@@ -7,7 +7,7 @@ module.exports = {
     var el = this.el
     if (!el.__vue__) {
       this.ref = document.createComment('v-if')
-      _.repace(el ,this.ref)
+      _.replace(el, this.ref)
       this.inserted = false
       if (el.tagName === 'TEMPLATE') {
         this.el = templateParser.parse(el)
@@ -22,7 +22,7 @@ module.exports = {
   },
 
   update: function (value) {
-    if(this.invalid) return
+    if (this.invalid) return
     if (value) {
       if (!this.inserted) {
         if (!this.childVM) {

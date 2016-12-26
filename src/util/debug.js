@@ -1,16 +1,16 @@
 var config = require('../config')
 
 /**
- * Enable debug utilities. The enableDebug() function and all
- * _.log() & _.warn() calls will be dropped in the minified
- * production build.
+ * Enable debug utilities. The enableDebug() function and
+ * all _.log() & _.warn() calls will be dropped in the
+ * minified production build.
  */
 
 enableDebug()
 
 function enableDebug () {
   var hasConsole = typeof console !== 'undefined'
-
+  
   /**
    * Log a message.
    *
@@ -19,7 +19,7 @@ function enableDebug () {
 
   exports.log = function (msg) {
     if (hasConsole && config.debug) {
-      console.log('[Vue info]: '+msg)
+      console.log('[Vue info]: ' + msg)
     }
   }
 
@@ -31,21 +31,20 @@ function enableDebug () {
 
   exports.warn = function (msg) {
     if (hasConsole && !config.silent) {
-      console.warn.apply('[Vue info]: '+msg)
+      console.warn('[Vue warn]: ' + msg)
       if (config.debug && console.trace) {
         console.trace()
       }
     }
   }
-}
 
-/**
+  /**
    * Assert asset exists
    */
 
   exports.assertAsset = function (val, type, id) {
     if (!val) {
-     exports.warn('Failed to resolve ' + type + ': ' + id)
+      exports.warn('Failed to resolve ' + type + ': ' + id)
     }
   }
- }
+}

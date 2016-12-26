@@ -5,7 +5,7 @@
  * @return {Boolean}
  */
 
-exports.isReserved = function(str){
+exports.isReserved = function (str) {
   var c = str.charCodeAt(0)
   return c === 0x24 || c === 0x5F
 }
@@ -82,8 +82,8 @@ exports.toArray = function (list, start) {
   start = start || 0
   var i = list.length - start
   var ret = new Array(i)
-  while(i--){
-    ret[i - start] = list[i]
+  while (i--) {
+    ret[i] = list[i + start]
   }
   return ret
 }
@@ -103,19 +103,19 @@ exports.extend = function (to, from) {
 
 /**
  * Quick object check - this is primarily used to tell
- * objects from primitive values when we know the value
+ * Objects from primitive values when we know the value
  * is a JSON-compliant type.
  *
  * @param {*} obj
  * @return {Boolean}
  */
 
-exports.isObject = function(obj) {
+exports.isObject = function (obj) {
   return obj && typeof obj === 'object'
 }
 
 /**
- * Strict object type check, Only returns true
+ * Strict object type check. Only returns true
  * for plain JavaScript objects.
  *
  * @param {*} obj
@@ -159,7 +159,7 @@ exports.define = function (obj, key, val, enumerable) {
 /**
  * Augment an target Object or Array by either
  * intercepting the prototype chain using __proto__,
- * or copy over property descriptors with defineProperty
+ * or copy over properties with defineProperty.
  *
  * @param {Object|Array} target
  * @param {Object} proto
@@ -168,11 +168,11 @@ exports.define = function (obj, key, val, enumerable) {
 var define = exports.define
 var hasProto = exports.hasProto = '__proto__' in {}
 exports.augment = hasProto
-  ? function(target, proto){
+  ? function (target, proto) {
       target.__proto__ = proto
     }
-  : function(target, proto){
-      for(var key in proto){
+  : function (target, proto) {
+      for (var key in proto) {
         define(target, key, proto[key])
       }
     }

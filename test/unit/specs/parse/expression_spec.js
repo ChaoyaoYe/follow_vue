@@ -179,7 +179,7 @@ var testCases = [
 ]
 
 describe('Expression Parser', function () {
-
+  
   it('parse getter', function () {
     testCases.forEach(function assertExp (testCase) {
       var res = expParser.parse(testCase.exp, true)
@@ -218,7 +218,7 @@ describe('Expression Parser', function () {
   })
 
   describe('invalid expression', function () {
-
+    
     beforeEach(function () {
       spyOn(_, 'warn')
     })

@@ -70,7 +70,7 @@ exports.parse = function (text) {
   var tokens = []
   var lastIndex = tagRE.lastIndex = 0
   var match, index, value, first, oneTime, partial
-  /*jshint  boss: true */
+  /* jshint boss:true */
   while (match = tagRE.exec(text)) {
     index = match.index
     // push text token
@@ -81,8 +81,8 @@ exports.parse = function (text) {
     }
     // tag token
     first = match[1].charCodeAt(0)
-    oneTime = first === 0x2A //*
-    partial = first === 0x3E //>
+    oneTime = first === 0x2A // *
+    partial = first === 0x3E // >
     value = (oneTime || partial)
       ? match[1].slice(1)
       : match[1]
@@ -108,21 +108,17 @@ exports.parse = function (text) {
  * Format a list of tokens into an expression.
  *
  * @param {Array} tokens
- * @param {String}
+ * @return {String}
  */
 
-exports.tokensToExp = function(tokens){
+exports.tokensToExp = function (tokens) {
   return tokens.length > 1
-    : tokens.length > 1
-    ? formatToken(tokens[0])
+    ? tokens.map(formatToken).join('+')
+    : formatToken(tokens[0])
 }
 
-function formatToken (token){
+function formatToken (token) {
   return token.tag
-    : token.value
-    ? '"' + token.value + '"'
+    ? token.value
+    : '"' + token.value + '"'
 }
-
-/**
- * text parser deal with partials
- */

@@ -7,7 +7,8 @@ var extend = _.extend
  * API conventions:
  * - public API methods/properties are prefiexed with `$`
  * - internal methods/properties are prefixed with `_`
- * - non-prefixed properties are assumed to be proxied user data.
+ * - non-prefixed properties are assumed to be proxied user
+ *   data.
  *
  * @constructor
  * @param {Object} [options]
@@ -15,7 +16,7 @@ var extend = _.extend
  */
 
 function Vue (options) {
-  this.init(options)
+  this._init(options)
 }
 
 /**
@@ -33,21 +34,23 @@ extend(Vue, require('./api/global'))
  * Vue instance.
  */
 
-exports.options = {
-  directives   : require('../directives'),
-  filters      : require('../filters'),
-  partials     : {},
-  transitions  : {},
-  components   : {}
+Vue.options = {
+  directives  : require('./directives'),
+  filters     : require('./filters'),
+  partials    : {},
+  transitions : {},
+  components  : {}
 }
 
 /**
  * Build up the prototype
  */
+
 var p = Vue.prototype
 
 /**
- * $data has a setter which does a bunch of teardown/setup work
+ * $data has a setter which does a bunch of
+ * teardown/setup work
  */
 
 Object.defineProperty(p, '$data', {

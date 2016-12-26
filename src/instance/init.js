@@ -1,14 +1,14 @@
-var Emitter = require('../emitter')
 var mergeOptions = require('../util/merge-option')
 
 /**
- * The main init sequence. This is called for every instance,
- * including ones that are created from extended constructors.
+ * The main init sequence. This is called for every
+ * instance, including ones that are created from extended
+ * constructors.
  *
- * @param {Object} options - this options object should be the
- *                           result of merging class options
- *                           and the options passed in to the
- *                           constructor.
+ * @param {Object} options - this options object should be
+ *                           the result of merging class
+ *                           options and the options passed
+ *                           in to the constructor.
  */
 
 exports._init = function (options) {
@@ -20,28 +20,28 @@ exports._init = function (options) {
   this.$root         = options._root || this
   this.$             = {}
   this._watcherList  = []
-  this._watcher      = {}
-  this._userWathers  = {}
+  this._watchers     = {}
+  this._userWatchers = {}
   this._directives   = []
 
   // a flag to avoid this being observed
   this._isVue = true
 
   // events bookkeeping
-  this._events       = {}
-  this._eventsCount  = {}
+  this._events         = {}
+  this._eventsCount    = {}
   this._eventCancelled = false
 
   // block instance properties
-  this._blockStart =
-  this.blockEnd = null
-  this._isBlock = false
+  this._blockStart  =
+  this._blockEnd    = null
+  this._isBlock     = false
 
   // lifecycle state
-  this._isCompiled =
+  this._isCompiled  =
   this._isDestroyed =
-  this._isReady =
-  this._isAttached = false
+  this._isReady     =
+  this._isAttached  = false
 
   // children
   this._children =
@@ -51,19 +51,19 @@ exports._init = function (options) {
   this._isAnonymous = options._anonymous
 
   // merge options.
-  options = mergeOptions(
+  options = this.$options = mergeOptions(
     this.constructor.options,
     options,
     this
   )
 
-  // set data after merge
+  // set data after merge.
   this._data = options.data || {}
 
-  // setup event system and option events
+  // setup event system and option events.
   this._initEvents()
 
-  // Initialize data observertion and scope inheritance
+  // initialize data observation and scope inheritance.
   this._initScope()
 
   // call created hook

@@ -21,7 +21,7 @@ describe('Watcher', function () {
     })
     spy = jasmine.createSpy('watcher')
   })
-
+  
   it('simple path', function (done) {
     var watcher = new Watcher(vm, 'b.c', spy)
     expect(watcher.value).toBe(2)

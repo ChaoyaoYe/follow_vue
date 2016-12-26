@@ -43,7 +43,7 @@ describe('Data API', function () {
     // invalid, should throw
     if (leftHandThrows()) {
       // if creating a function with invalid left hand
-      // expression throws, the exp parser will catch the
+      // expression throws, the exp parser will catch the 
       // error and warn.
       vm.$set('c + d', 1)
       expect(_.warn).toHaveBeenCalled()

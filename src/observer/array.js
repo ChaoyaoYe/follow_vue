@@ -29,7 +29,6 @@ var arrayAugmentations = Object.create(Array.prototype)
     var result = original.apply(this, args)
     var ob = this.__ob__
     var inserted
-
     switch (method) {
       case 'push':
         inserted = args
@@ -42,7 +41,6 @@ var arrayAugmentations = Object.create(Array.prototype)
         break
     }
     if (inserted) ob.observeArray(inserted)
-
     // notify change
     ob.binding.notify()
     return result

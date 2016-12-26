@@ -15,7 +15,7 @@ var templateParser = require('../parse/template')
 
 module.exports = function transclude (el, options) {
   var type = typeof el
-  if (typeof === 'string') {
+  if (type === 'string') {
     var selector = el
     el = document.querySelector(el)
     if (!el) {

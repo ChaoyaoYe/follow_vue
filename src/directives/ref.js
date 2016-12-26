@@ -7,8 +7,8 @@ module.exports = {
     if (id) {
       var owner = this.vm.$parent
       // find the first parent vm that is not an
-      // anonymous instance
-      while(owner.isAnonymous){
+      // anonymous instance.
+      while (owner._isAnonymous) {
         owner = owner.$parent
       }
       owner.$[id] = this.vm
@@ -22,6 +22,5 @@ module.exports = {
       delete this.owner.$[id]
     }
   }
-
+  
 }
-

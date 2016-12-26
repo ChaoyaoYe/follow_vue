@@ -24,7 +24,7 @@ module.exports = function (grunt) {
         src: 'src/**/*.js'
       },
       test: {
-        src: 'test/unit/specs/**/*.js'
+        src: ['test/unit/specs/**/*.js']
       }
     },
 
@@ -37,10 +37,10 @@ module.exports = function (grunt) {
         tasks: ['dev']
       },
       test: {
-        files: ['test/unit/spec/**/*.js'],
+        files: ['test/unit/specs/**/*.js'],
         tasks: ['build-test']
       }
-    }
+    },
 
     karma: {
       options: {
@@ -67,18 +67,20 @@ module.exports = function (grunt) {
           reporters: ['progress', 'coverage'],
           preprocessors: {
             'src/**/*.js': ['commonjs', 'coverage'],
-            'test/unit/specs/**/*.js: ['commonjs']'
+            'test/unit/specs/**/*.js': ['commonjs']
           },
           coverageReporter: {
             reporters: [
-              {type: 'lcov'},
-              {type: 'text-summary'}
+              { type: 'lcov' },
+              { type: 'text-summary' }
             ]
           }
         }
       }
-    },
+    }
 
+  })
+  
   // load npm tasks
   grunt.loadNpmTasks('grunt-contrib-jshint')
   grunt.loadNpmTasks('grunt-contrib-watch')
@@ -91,7 +93,7 @@ module.exports = function (grunt) {
 
   grunt.registerTask('unit', ['karma:browsers'])
   grunt.registerTask('cover', ['karma:phantom'])
-  grunt.registerTask('test', ['unit', 'conver'])
+  grunt.registerTask('test', ['unit', 'cover'])
   grunt.registerTask('default', ['jshint', 'test', 'build'])
 
 }

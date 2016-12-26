@@ -18,7 +18,7 @@ exports._initScope = function () {
 }
 
 /**
- * Initialize the data.
+ * Initialize the data. 
  */
 
 exports._initData = function () {

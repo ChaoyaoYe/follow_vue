@@ -27,9 +27,9 @@ if (_.inBrowser) {
         el: frag
       })
     })
-
+    
     describe('$appendTo', function () {
-
+      
       it('normal instance', function () {
         vm.$appendTo(parent)
         expect(parent.childNodes.length).toBe(3)
@@ -48,7 +48,7 @@ if (_.inBrowser) {
     })
 
     describe('$prependTo', function () {
-
+      
       it('normal instance', function () {
         vm.$prependTo(parent)
         expect(parent.childNodes.length).toBe(3)
@@ -77,7 +77,7 @@ if (_.inBrowser) {
     })
 
     describe('$before', function () {
-
+      
       it('normal instance', function () {
         vm.$before(sibling)
         expect(parent.childNodes.length).toBe(3)
@@ -96,7 +96,7 @@ if (_.inBrowser) {
     })
 
     describe('$after', function () {
-
+      
       it('normal instance', function () {
         vm.$after(target)
         expect(parent.childNodes.length).toBe(3)
@@ -115,7 +115,7 @@ if (_.inBrowser) {
     })
 
     describe('$remove', function () {
-
+      
       it('normal instance', function () {
         vm.$before(sibling)
         expect(parent.childNodes.length).toBe(3)

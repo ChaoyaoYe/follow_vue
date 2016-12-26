@@ -37,7 +37,7 @@ module.exports = {
       }
     } else {
       _.warn(
-        'v-component=" ' + this.expression + '" cannot be ' +
+        'v-component="' + this.expression + '" cannot be ' +
         'used on an already mounted instance.'
       )
     }
@@ -56,7 +56,7 @@ module.exports = {
       this.ifWatcher = new Watcher(
         this.vm,
         condition,
-        function(value){
+        function (value) {
           self.toggleIf(value)
         }
       )
@@ -139,7 +139,7 @@ module.exports = {
         el: this.el.cloneNode(true),
         _linker: this._linker
       }, this.Ctor)
-      if(this.keepAlive){
+      if (this.keepAlive) {
         this.cache[this.id] = this.childVM
       }
       this.childVM.$before(this.ref)
@@ -196,11 +196,3 @@ module.exports = {
   }
 
 }
-
-/**
- * keep-alive option for v-component
- */
-
-/**
- * working on v-repeat
- */

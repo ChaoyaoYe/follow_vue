@@ -20,9 +20,6 @@ exports.$addChild = function (opts, BaseCtor) {
     ? opts.inherit
     : BaseCtor.options.inherit
   if (inherit) {
-    ChildVue = BaseCtor
-  } else {
-    var parent = this
     var ctors = parent._childCtors
     if (!ctors) {
       ctors = parent._childCtors = {}
@@ -36,9 +33,9 @@ exports.$addChild = function (opts, BaseCtor) {
       ChildVue.options = BaseCtor.options
       ChildVue.prototype = this
       ctors[BaseCtor.cid] = ChildVue
-    }else {
-      ChildVue = BaseCtor
     }
+  } else {
+    ChildVue = BaseCtor
   }
   opts._parent = parent
   opts._root = parent.$root

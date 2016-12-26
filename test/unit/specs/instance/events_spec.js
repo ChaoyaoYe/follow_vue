@@ -53,7 +53,7 @@ describe('Instance Events', function () {
   })
 
   describe('hooks', function () {
-
+    
     it('created', function () {
       var ctx
       var vm = new Vue({

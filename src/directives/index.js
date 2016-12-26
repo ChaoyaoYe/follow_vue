@@ -1,5 +1,3 @@
-var directives = module.exports = Object.create(null)
-
 // manipulation directives
 exports.text       = require('./text')
 exports.html       = require('./html')
@@ -20,4 +18,4 @@ exports.model      = require('./model')
 exports.component  = require('./component')
 exports.repeat     = require('./repeat')
 exports['if']      = require('./if')
-exports['with'] = require('./with')
+exports['with']    = require('./with')

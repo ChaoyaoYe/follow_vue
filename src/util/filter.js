@@ -22,7 +22,7 @@ exports.resolveFilters = function (vm, filters, target) {
   filters.forEach(function (f) {
     var def = vm.$options.filters[f.name]
     _.assertAsset(def, 'filter', f.name)
-    if(!def) return
+    if (!def) return
     var args = f.args
     var reader, writer
     if (typeof def === 'function') {

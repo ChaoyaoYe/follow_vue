@@ -1,14 +1,15 @@
-var _ = require('../../../src/util')
-var merge = require('../../../src/util/merge-option')
+var _ = require('../../../../src/util')
+var Vue = require('../../../../src/vue')
+var merge = require('../../../../src/util/merge-option')
 
 describe('Util - Option merging', function () {
-
+  
   it('default strat', function () {
     // child undefined
     var res = merge({replace:true}, {}).replace
     expect(res).toBe(true)
     // child overwrite
-    var res = merge({replace:true}, {replace:false}).replace
+    res = merge({replace:true}, {replace:false}).replace
     expect(res).toBe(false)
   })
 
@@ -36,6 +37,13 @@ describe('Util - Option merging', function () {
 
   it('events', function () {
 
+    // no parent
+    res = merge({}, {events:1})
+    expect(res.events).toBe(1)
+    // no child
+    res = merge({events:1}, {})
+    expect(res.events).toBe(1)
+
     var fn1 = function () {}
     var fn2 = function () {}
     var fn3 = function () {}
@@ -55,7 +63,7 @@ describe('Util - Option merging', function () {
     assertRes(res.fn1, [fn1, fn2, fn3])
     assertRes(res.fn2, [fn2])
     assertRes(res.fn3, [fn3])
-
+    
     function assertRes (res, expected) {
       expect(Array.isArray(res)).toBe(true)
       expect(res.length).toBe(expected.length)
@@ -64,7 +72,6 @@ describe('Util - Option merging', function () {
         expect(res[i]).toBe(expected[i])
       }
     }
-
   })
 
   it('normal object hashes', function () {
@@ -88,39 +95,100 @@ describe('Util - Option merging', function () {
     var asset1 = {}
     var asset2 = {}
     var asset3 = {}
-    // mock vm
-    var vm = {
-      $parent: {
-        $options: {
-          directives: {
-            c: asset3
-          }
-        }
-      }
-    }
     var res = merge(
       { directives: { a: asset1 }},
+      { directives: { b: asset2 }}
+    ).directives
+    expect(res.a).toBe(asset1)
+    expect(res.b).toBe(asset2)
+    // vm asset merge should do tree-way merge
+    res = merge(
+      { directives: { a: asset1 }},
       { directives: { b: asset2 }},
-      vm
+      {
+        $parent: {
+          $options: {
+            directives: { c: asset3 }
+          }
+        }
+      },
+      'directives'
     ).directives
     expect(res.a).toBe(asset1)
     expect(res.b).toBe(asset2)
     expect(res.c).toBe(asset3)
-    // test prototypal inheritance
-    var asset4 = vm.$parent.$options.directives.d = {}
-    expect(res.d).toBe(asset4)
   })
 
-  it('ignore el, data & parent when inheriting', function () {
-    var res = merge({}, {el:1, data:2, parent:3})
+  it('guard components', function () {
+    var res = merge({}, {
+      components: {
+        a: { template: 'hi' }
+      }
+    })
+    expect(typeof res.components.a).toBe('function')
+    expect(res.components.a.super).toBe(Vue)
+  })
+
+  it('should ignore non-function el & data in class merge', function () {
+    var res = merge({}, {el:1, data:2})
     expect(res.el).toBeUndefined()
     expect(res.data).toBeUndefined()
-    expect(res.parent).toBeUndefined()
+  })
 
-    res = merge({}, {el:1, data:2, parent:3}, {})
+  it('class data/el merge', function () {
+    function fn1 () {}
+    function fn2 () {}
+    var res = merge({data:fn1, el:fn1}, {data:fn2})
+    expect(res.data).toBe(fn2)
+    expect(res.el).toBe(fn1)
+  })
+
+  it('instanace el merge', function () {
+    function fn1 () {
+      return 1
+    }
+    function fn2 () {
+      return 2
+    }
+    // both functions
+    var res = merge({el:fn1}, {el:fn2}, {})
+    expect(res.el).toBe(2)
+    // direct instance el
+    res = merge({el:fn1}, {el:2}, {})
+    expect(res.el).toBe(2)
+    // no parent
+    res = merge({}, {el:2}, {})
+    expect(res.el).toBe(2)
+    // no child
+    res = merge({el:fn1}, {}, {})
     expect(res.el).toBe(1)
-    expect(res.data).toBe(2)
-    expect(res.parent).toBe(3)
+  })
+
+  it('instance data merge with no instance data', function () {
+    var res = merge(
+      {data: function () {
+        return { a: 1}
+      }},
+      {}, // no instance data
+      {} // mock vm presence
+    )
+    expect(res.data.a).toBe(1)
+  })
+
+  it('instance data merge with default data function', function () {
+    var res = merge(
+      // component default
+      { data: function () {
+        return {
+          a: 1,
+          b: 2
+        }
+      }},
+      { data: { a: 2 }}, // instance data
+      {} // mock vm presence
+    )
+    expect(res.data.a).toBe(2)
+    expect(res.data.b).toBe(2)
   })
 
 })

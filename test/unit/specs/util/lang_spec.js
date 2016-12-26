@@ -33,7 +33,7 @@ describe('Util - Language Enhancement', function () {
     var res = bound('arg a')
     expect(res).toBe('ctx a arg a')
   })
-
+  
   it('toArray', function () {
     // should make a copy of original array
     var arr = [1,2,3]

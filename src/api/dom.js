@@ -76,11 +76,11 @@ exports.$remove = function (cb, withTransition) {
   var inDoc = this._isAttached && _.inDoc(this.$el)
   // if we are not in document, no need to check
   // for transitions
-  if(!inDoc) withTransition = false
+  if (!inDoc) withTransition = false
   var op
   var self = this
   var realCb = function () {
-    if(inDoc) self._callHook('detached')
+    if (inDoc) self._callHook('detached')
     if (cb) cb()
   }
   if (
@@ -89,7 +89,7 @@ exports.$remove = function (cb, withTransition) {
   ) {
     op = withTransition === false
       ? _.append
-      : transition.removeThenAppend
+      : transition.removeThenAppend 
     blockOp(this, this._blockFragment, op, realCb)
   } else {
     op = withTransition === false

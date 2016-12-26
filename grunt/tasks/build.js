@@ -6,7 +6,7 @@ module.exports = function (grunt) {
     var zlib = require('zlib')
     var build = require('../shared-build')
     var uglifyjs = require('uglify-js')
-
+    
     // update component.json first
     var jsRE = /\.js$/
     var component = grunt.file.readJSON('component.json')

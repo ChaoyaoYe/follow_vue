@@ -1,4 +1,4 @@
-var Cache = require('../../src/cache')
+var Cache = require('../../../src/cache')
 
 /**
  * Debug function to assert cache state
@@ -22,7 +22,7 @@ function toString (cache) {
 describe('Cache', function () {
 
   var c = new Cache(4)
-
+  
   it('put', function () {
     c.put('adam', 29)
     c.put('john', 26)

@@ -140,7 +140,8 @@ function getPathCharType (char) {
 function parsePath (path) {
   var keys = []
   var index = -1
-  var c, newChar, key, type, transition, action, typeMap, mode = 'beforePath'
+  var mode = 'beforePath'
+  var c, newChar, key, type, transition, action, typeMap
 
   var actions = {
     push: function() {
@@ -188,7 +189,9 @@ function parsePath (path) {
 
     mode = transition[0]
     action = actions[transition[1]] || noop
-    newChar = transition[2] === undefined ? c : transition[2]
+    newChar = transition[2] === undefined
+      ? c
+      : transition[2]
     action()
 
     if (mode === 'afterPath') {
@@ -225,7 +228,7 @@ exports.compileGetter = function (path) {
   var body =
     'try{return o' +
     path.map(formatAccessor).join('') +
-    '}catch(e){}'
+    '}catch(e){};'
   return new Function('o', body)
 }
 
@@ -274,23 +277,23 @@ exports.set = function (obj, path, val) {
   if (typeof path === 'string') {
     path = exports.parse(path)
   }
-  var last, key
-  if (!path || _.isObject(obj)) {
+  if (!path || !_.isObject(obj)) {
     return false
   }
+  var last, key
   for (var i = 0, l = path.length - 1; i < l; i++) {
     last = obj
     key = path[i]
     obj = obj[key]
-    if(!_.isObject(obj)){
+    if (!_.isObject(obj)) {
       obj = {}
       add(last, key, obj)
     }
   }
   key = path[i]
-  if(obj.hasOwnProperty(key)) {
+  if (obj.hasOwnProperty(key)) {
     obj[key] = val
-  }else {
+  } else {
     add(obj, key, val)
   }
   return true
@@ -311,4 +314,4 @@ function add (obj, key, val) {
   } else {
     obj[key] = val
   }
- }
+}
