@@ -83,6 +83,13 @@ describe('Text Parser', function () {
         { tag: true, value: 'html', html: true, oneTime: false },
       ]
     })
+    config.delimiters = ['{{', '}}']
+  })
+
+  it('tokens to expression', function(){
+    var tokens = textParser.parse('view-{{test}}-test-{{ok}}')
+    var exp = textParser.tokensToExp(tokens)
+    expect(exp).toBe('"view-"+test+"-test-"+ok')
   })
 
 })

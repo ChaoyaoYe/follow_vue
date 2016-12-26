@@ -23,61 +23,28 @@ var arrayAugmentations = Object.create(Array.prototype)
     // http://jsperf.com/closure-with-arguments
     var i = arguments.length
     var args = new Array(i)
-    while(i--) {
+    while (i--) {
       args[i] = arguments[i]
     }
     var result = original.apply(this, args)
     var ob = this.__ob__
-    var inserted, removed, index
+    var inserted
 
     switch (method) {
       case 'push':
         inserted = args
-        index = this.length - args.length
         break
       case 'unshift':
         inserted = args
-        index = 0
-        break
-      case 'pop':
-        removed = [result]
-        index = this.length
-        break
-      case 'shift':
-        removed = [result]
-        index = 0
         break
       case 'splice':
         inserted = args.slice(2)
-        removed = result
-        index = args[0]
         break
     }
+    if (inserted) ob.observeArray(inserted)
 
-    // link/unlink added/removed elements
-    if (inserted) ob.link(inserted, index)
-    if (removed) ob.unlink(removed)
-
-    // update indices
-    if (method !== 'push' && method !== 'pop') {
-      ob.updateIndices()
-    }
-
-    // emit length change
-    if (inserted || removed) {
-      ob.propagate('set', 'length', this.length)
-    }
-
-    // empty path, value is the Array itself
-    ob.propagate('mutate', '', this, {
-      method   : method,
-      args     : args,
-      result   : result,
-      index    : index,
-      inserted : inserted || [],
-      removed  : removed || []
-    })
-
+    // notify change
+    ob.binding.notify()
     return result
   }
   // define wrapped method

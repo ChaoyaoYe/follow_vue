@@ -1,10 +1,5 @@
-/**
- * Test data observation.
- */
-
-var Observer = require('../../../src/observe/observer')
+var Observer = require('../../../src/observer')
 var _ = require('../../../src/util')
-Observer.pathDelimiter = '.'
 
 describe('Observer', function () {
 
@@ -13,386 +8,160 @@ describe('Observer', function () {
     spy = jasmine.createSpy('observer')
   })
 
-  it('get', function () {
+  it('create on non-observables', function () {
+    // skip primitive value
+    var ob = Observer.create(1)
+    expect(ob).toBeUndefined()
+    // avoid vue instance
+    ob = Observer.create(new _.Vue())
+    expect(ob).toBeUndefined()
+  })
 
-    Observer.emitGet = true
-
+  it('create on object', function () {
+    // on object
     var obj = {
-      a: 1,
-      b: {
-        c: 2
-      }
+      a: {},
+      b: {}
     }
     var ob = Observer.create(obj)
-    ob.on('get', spy)
-
-    var t = obj.a
-    expect(spy).toHaveBeenCalledWith('a', undefined, undefined, undefined)
-    expect(spy.calls.count()).toBe(1)
-
-    t = obj.b.c
-    expect(spy).toHaveBeenCalledWith('b', undefined, undefined, undefined)
-    expect(spy).toHaveBeenCalledWith('b.c', undefined, undefined, undefined)
-    expect(spy.calls.count()).toBe(3)
-
-    Observer.emitGet = false
+    expect(ob instanceof Observer).toBe(true)
+    expect(ob.active).toBe(true)
+    expect(ob.value).toBe(obj)
+    expect(obj.__ob__).toBe(ob)
+    // should've walked children
+    expect(obj.a.__ob__ instanceof Observer).toBe(true)
+    expect(obj.b.__ob__ instanceof Observer).toBe(true)
+    // should return existing ob on already observed objects
+    var ob2 = Observer.create(obj)
+    expect(ob2).toBe(ob)
   })
 
-  it('set', function () {
-    var obj = {
-      a: 1,
-      b: {
-        c: 2
-      }
+  it('create on array', function () {
+    // on object
+    var arr = [{}, {}]
+    var ob = Observer.create(arr)
+    expect(ob instanceof Observer).toBe(true)
+    expect(ob.active).toBe(true)
+    expect(ob.value).toBe(arr)
+    expect(arr.__ob__).toBe(ob)
+    // should've walked children
+    expect(arr[0].__ob__ instanceof Observer).toBe(true)
+    expect(arr[1].__ob__ instanceof Observer).toBe(true)
+  })
+
+  it('observing object prop change', function () {
+    var obj = { a: { b: 2 } }
+    Observer.create(obj)
+    // mock a watcher!
+    var watcher = {
+      deps: [],
+      addDep: function (binding) {
+        this.deps.push(binding)
+        binding.addSub(this)
+      },
+      update: jasmine.createSpy()
     }
-    var ob = Observer.create(obj)
-    ob.on('set', spy)
-
-    obj.a = 3
-    expect(spy).toHaveBeenCalledWith('a', 3, undefined, undefined)
-    expect(spy.calls.count()).toBe(1)
-
-    obj.b.c = 4
-    expect(spy).toHaveBeenCalledWith('b.c', 4, undefined, undefined)
-    expect(spy.calls.count()).toBe(2)
-
-    // swap set
-    var newB = { c: 5 }
-    obj.b = newB
-    expect(spy).toHaveBeenCalledWith('b', newB, undefined, undefined)
-    expect(spy.calls.count()).toBe(3)
-
-    // same value set should not emit events
-    obj.a = 3
-    expect(spy.calls.count()).toBe(3)
+    var dump
+    // collect dep
+    Observer.target = watcher
+    dump = obj.a.b
+    Observer.target = null
+    expect(watcher.deps.length).toBe(2)
+    dump = obj.a.b = 3
+    expect(watcher.update.calls.count()).toBe(1)
+    // swap object
+    obj.a = { b: 4 }
+    expect(watcher.update.calls.count()).toBe(2)
+    // recollect dep
+    var oldDeps = watcher.deps
+    watcher.deps = []
+    Observer.target = watcher
+    dump = obj.a.b
+    Observer.target = null
+    expect(watcher.deps.length).toBe(2)
+    // make sure we picked up the new bindings
+    expect(watcher.deps[0]).not.toBe(oldDeps[0])
+    expect(watcher.deps[1]).not.toBe(oldDeps[1])
+    // set on the swapped object
+    obj.a.b = 5
+    expect(watcher.update.calls.count()).toBe(3)
   })
 
-  it('ignore prefix', function () {
-    var obj = {
-      _test: 123,
-      $test: 234
-    }
-    var ob = Observer.create(obj)
-    ob.on('set', spy)
-    obj._test = 234
-    obj.$test = 345
-    expect(spy.calls.count()).toBe(0)
-  })
-  
-  it('warn duplicate value', function () {
-    spyOn(_, 'warn')
-    var obj = {
-      a: { b: 123 },
-      b: null
-    }
-    var ob = Observer.create(obj)
-    obj.b = obj.a
-    expect(_.warn).toHaveBeenCalled()
-  })
-
-  it('array get', function () {
-
-    Observer.emitGet = true
-
-    var obj = {
-      arr: [{a:1}, {a:2}]
-    }
-    var ob = Observer.create(obj)
-    ob.on('get', spy)
-
-    var t = obj.arr[0].a
-    expect(spy).toHaveBeenCalledWith('arr', undefined, undefined, undefined)
-    expect(spy).toHaveBeenCalledWith('arr.0.a', undefined, undefined, undefined)
-    expect(spy.calls.count()).toBe(2)
-
-    Observer.emitGet = false
-  })
-
-  it('array set', function () {
-    var obj = {
-      arr: [{a:1}, {a:2}]
-    }
-    var ob = Observer.create(obj)
-    ob.on('set', spy)
-
-    obj.arr[0].a = 2
-    expect(spy).toHaveBeenCalledWith('arr.0.a', 2, undefined, undefined)
-
-    // set events after mutation
-    obj.arr.reverse()
-    obj.arr[0].a = 3
-    expect(spy).toHaveBeenCalledWith('arr.0.a', 3, undefined, undefined)
-  })
-
-  it('array push', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.push({a:3})
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('push')
-    expect(mutation.index).toBe(2)
-    expect(mutation.removed.length).toBe(0)
-    expect(mutation.inserted.length).toBe(1)
-    expect(mutation.inserted[0]).toBe(arr[2])
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[2].a = 4
-    expect(spy).toHaveBeenCalledWith('2.a', 4, undefined, undefined)
-  })
-
-  it('array pop', function () {
-    var arr = [{a:1}, {a:2}]
-    var popped = arr[1]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.pop()
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('pop')
-    expect(mutation.index).toBe(1)
-    expect(mutation.inserted.length).toBe(0)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.removed[0]).toBe(popped)
-  })
-
-  it('array shift', function () {
-    var arr = [{a:1}, {a:2}]
-    var shifted = arr[0]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.shift()
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('shift')
-    expect(mutation.index).toBe(0)
-    expect(mutation.inserted.length).toBe(0)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.removed[0]).toBe(shifted)
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[0].a = 4
-    expect(spy).toHaveBeenCalledWith('0.a', 4, undefined, undefined)
-  })
-
-  it('array unshift', function () {
-    var arr = [{a:1}, {a:2}]
-    var unshifted = {a:3}
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.unshift(unshifted)
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('unshift')
-    expect(mutation.index).toBe(0)
-    expect(mutation.removed.length).toBe(0)
-    expect(mutation.inserted.length).toBe(1)
-    expect(mutation.inserted[0]).toBe(unshifted)
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[1].a = 4
-    expect(spy).toHaveBeenCalledWith('1.a', 4, undefined, undefined)
-  })
-
-  it('array splice', function () {
-    var arr = [{a:1}, {a:2}]
-    var inserted = {a:3}
-    var removed = arr[1]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.splice(1, 1, inserted)
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('splice')
-    expect(mutation.index).toBe(1)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.inserted.length).toBe(1)
-    expect(mutation.removed[0]).toBe(removed)
-    expect(mutation.inserted[0]).toBe(inserted)
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[1].a = 4
-    expect(spy).toHaveBeenCalledWith('1.a', 4, undefined, undefined)
-  })
-
-  it('array sort', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.sort(function (a, b) {
-      return a.a < b.a ? 1 : -1
-    })
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('sort')
-    expect(mutation.index).toBeUndefined()
-    expect(mutation.removed.length).toBe(0)
-    expect(mutation.inserted.length).toBe(0)
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[1].a = 4
-    expect(spy).toHaveBeenCalledWith('1.a', 4, undefined, undefined)
-  })
-
-  it('array reverse', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    arr.reverse()
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('reverse')
-    expect(mutation.index).toBeUndefined()
-    expect(mutation.removed.length).toBe(0)
-    expect(mutation.inserted.length).toBe(0)
-    // test index update after mutation
-    ob.on('set', spy)
-    arr[1].a = 4
-    expect(spy).toHaveBeenCalledWith('1.a', 4, undefined, undefined)
-  })
-
-  it('object.$add', function () {
-    var obj = {a:{b:1}}
-    var ob = Observer.create(obj)
-    ob.on('add', spy)
-
-    // ignore existing keys
-    obj.$add('a', 123)
-    expect(spy.calls.count()).toBe(0)
-
-    // add event
-    var add = {d:2}
-    obj.a.$add('c', add)
-    expect(spy).toHaveBeenCalledWith('a.c', add, undefined, undefined)
-
-    // check if add object is properly observed
-    ob.on('set', spy)
-    obj.a.c.d = 3
-    expect(spy).toHaveBeenCalledWith('a.c.d', 3, undefined, undefined)
-  })
-
-  it('object.$delete', function () {
-    var obj = {a:{b:1}}
-    var ob = Observer.create(obj)
-    ob.on('delete', spy)
-
-    // ignore non-present key
-    obj.$delete('c')
-    expect(spy.calls.count()).toBe(0)
-
-    obj.a.$delete('b')
-    expect(spy).toHaveBeenCalledWith('a.b', undefined, undefined, undefined)
-  })
-
-  it('array.$set', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    var inserted = {a:3}
-    var removed = arr[1]
-    arr.$set(1, inserted)
-
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('splice')
-    expect(mutation.index).toBe(1)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.inserted.length).toBe(1)
-    expect(mutation.removed[0]).toBe(removed)
-    expect(mutation.inserted[0]).toBe(inserted)
-
-    ob.on('set', spy)
-    arr[1].a = 4
-    expect(spy).toHaveBeenCalledWith('1.a', 4, undefined, undefined)
-  })
-
-  it('array.$set with out of bound length', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    var inserted = {a:3}
-    arr.$set(3, inserted)
-    expect(arr.length).toBe(4)
-    expect(arr[2]).toBeUndefined()
-    expect(arr[3]).toBe(inserted)
-  })
-
-  it('array.$remove', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    var removed = arr.$remove(0)
-
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('splice')
-    expect(mutation.index).toBe(0)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.inserted.length).toBe(0)
-    expect(mutation.removed[0]).toBe(removed)
-
-    ob.on('set', spy)
-    arr[0].a = 3
-    expect(spy).toHaveBeenCalledWith('0.a', 3, undefined, undefined)
-  })
-
-  it('array.$remove object', function () {
-    var arr = [{a:1}, {a:2}]
-    var ob = Observer.create(arr)
-    ob.on('mutate', spy)
-    var removed = arr.$remove(arr[0])
-
-    expect(spy.calls.mostRecent().args[0]).toBe('')
-    expect(spy.calls.mostRecent().args[1]).toBe(arr)
-    var mutation = spy.calls.mostRecent().args[2]
-    expect(mutation).toBeDefined()
-    expect(mutation.method).toBe('splice')
-    expect(mutation.index).toBe(0)
-    expect(mutation.removed.length).toBe(1)
-    expect(mutation.inserted.length).toBe(0)
-    expect(mutation.removed[0]).toBe(removed)
-
-    ob.on('set', spy)
-    arr[0].a = 3
-    expect(spy).toHaveBeenCalledWith('0.a', 3, undefined, undefined)
-  })
-
-  it('shared observe', function () {
+  it('observing $add/$delete', function () {
     var obj = { a: 1 }
-    var parentA = { child1: obj }
-    var parentB = { child2: obj }
-    var obA = Observer.create(parentA)
-    var obB = Observer.create(parentB)
-    obA.on('set', spy)
-    obB.on('set', spy)
-    obj.a = 2
-    expect(spy.calls.count()).toBe(2)
-    expect(spy).toHaveBeenCalledWith('child1.a', 2, undefined, undefined)
-    expect(spy).toHaveBeenCalledWith('child2.a', 2, undefined, undefined)
-    // test unobserve
-    parentA.child1 = null
-    obj.a = 3
-    expect(spy.calls.count()).toBe(4)
-    expect(spy).toHaveBeenCalledWith('child1', null, undefined, undefined)
-    expect(spy).toHaveBeenCalledWith('child2.a', 3, undefined, undefined)
+    var ob = Observer.create(obj)
+    var binding = ob.binding
+    spyOn(binding, 'notify')
+    obj.$add('b', 2)
+    expect(obj.b).toBe(2)
+    expect(binding.notify.calls.count()).toBe(1)
+    obj.$delete('a')
+    expect(obj.hasOwnProperty('a')).toBe(false)
+    expect(binding.notify.calls.count()).toBe(2)
+    // should ignore adding an existing key
+    obj.$add('b', 3)
+    expect(obj.b).toBe(2)
+    expect(binding.notify.calls.count()).toBe(2)
+    // should ignore deleting non-existing key
+    obj.$delete('a')
+    expect(binding.notify.calls.count()).toBe(2)
+  })
+
+  it('observing array mutation', function () {
+    var arr = []
+    var ob = Observer.create(arr)
+    var binding = ob.binding
+    spyOn(binding, 'notify')
+    var objs = [{}, {}, {}]
+    arr.push(objs[0])
+    arr.pop()
+    arr.unshift(objs[1])
+    arr.shift()
+    arr.splice(0, 0, objs[2])
+    arr.sort()
+    arr.reverse()
+    expect(binding.notify.calls.count()).toBe(7)
+    // inserted elements should be observed
+    objs.forEach(function (obj) {
+      expect(obj.__ob__ instanceof Observer).toBe(true)
+    })
+  })
+
+  it('array $set', function () {
+    var arr = [1]
+    var ob = Observer.create(arr)
+    var binding = ob.binding
+    spyOn(binding, 'notify')
+    arr.$set(0, 2)
+    expect(arr[0]).toBe(2)
+    expect(binding.notify.calls.count()).toBe(1)
+    // setting out of bound index
+    arr.$set(2, 3)
+    expect(arr[2]).toBe(3)
+    expect(binding.notify.calls.count()).toBe(2)
+  })
+
+  it('array $remove', function () {
+    var arr = [{}, {}]
+    var obj1 = arr[0]
+    var obj2 = arr[1]
+    var ob = Observer.create(arr)
+    var binding = ob.binding
+    spyOn(binding, 'notify')
+    // remove by index
+    arr.$remove(0)
+    expect(arr.length).toBe(1)
+    expect(arr[0]).toBe(obj2)
+    expect(binding.notify.calls.count()).toBe(1)
+    // remove by identity, not in array
+    arr.$remove(obj1)
+    expect(arr.length).toBe(1)
+    expect(arr[0]).toBe(obj2)
+    expect(binding.notify.calls.count()).toBe(1)
+    // remove by identity, in array
+    arr.$remove(obj2)
+    expect(arr.length).toBe(0)
+    expect(binding.notify.calls.count()).toBe(2)
   })
 
 })

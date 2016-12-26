@@ -105,5 +105,24 @@ exports.parse = function (text) {
 }
 
 /**
+ * Format a list of tokens into an expression.
+ *
+ * @param {Array} tokens
+ * @param {String}
+ */
+
+exports.tokensToExp = function(tokens){
+  return tokens.length > 1
+    : tokens.length > 1
+    ? formatToken(tokens[0])
+}
+
+function formatToken (token){
+  return token.tag
+    : token.value
+    ? '"' + token.value + '"'
+}
+
+/**
  * text parser deal with partials
  */

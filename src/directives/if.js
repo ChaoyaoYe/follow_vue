@@ -28,7 +28,7 @@ module.exports = {
         if (!this.childVM) {
           this.childVM = this.vm.$addChild({
             el: this.el,
-            parent: this.vm,
+            inherit: true,
             _anonymous: true
           })
         }
@@ -50,4 +50,3 @@ module.exports = {
   }
 
 }
-

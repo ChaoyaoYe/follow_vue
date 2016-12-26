@@ -13,8 +13,13 @@ var _ = require('../util')
 
 exports.$addChild = function (opts, BaseCtor) {
   BaseCtor = BaseCtor || _.Vue
+  opts = opts || {}
+  var parent = this
   var ChildVue
-  if (BaseCtor.options.isolated) {
+  var inherit = opts.inherit !== undefined
+    ? opts.inherit
+    : BaseCtor.options.inherit
+  if (inherit) {
     ChildVue = BaseCtor
   } else {
     var parent = this
@@ -25,41 +30,22 @@ exports.$addChild = function (opts, BaseCtor) {
     ChildVue = ctors[BaseCtor.cid]
     if (!ChildVue) {
       ChildVue = function (options) {
-        this.$parent = parent
-        this.$root = parent.$root || parent
         this.constructor = ChildVue
         _.Vue.call(this, options)
       }
       ChildVue.options = BaseCtor.options
       ChildVue.prototype = this
       ctors[BaseCtor.cid] = ChildVue
+    }else {
+      ChildVue = BaseCtor
     }
   }
+  opts._parent = parent
+  opts._root = parent.$root
   var child = new ChildVue(opts)
   if (!this._children) {
     this._children = []
   }
   this._children.push(child)
   return child
-}
-
-/**
- * Propagate a path update down the scope chain, notifying
- * all non-isolated child instances.
- *
- * @param {String} path
- */
-
-exports._notifyChildren = function (path) {
-  var children = this._children
-  if (children) {
-    var i = children.length
-    var child
-    while (i--) {
-      child = children[i]
-      if (!child.$options.isolated) {
-        child._updateBindingAt(path, null, null, true)
-      }
-    }
-  }
 }

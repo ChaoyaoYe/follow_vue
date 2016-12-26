@@ -1,32 +1,18 @@
+var uid = 0
+
 /**
- * A binding is an observable that can have multiple directives
- * subscribing to it. It can also have multiple other bindings
- * as children to form a tree-like structure.
- *
- * All binding properties are prefixed with '_' so that they
- * don't conflict with children keys.
+ * A binding is an observable that can have multiple
+ * directives subscribing to it.
  *
  * @constructor
  */
 
 function Binding () {
+  this.id = ++uid
   this.subs = []
 }
 
 var p = Binding.prototype
-
-/**
- * Add a child binding to the tree
- *
- * @param {String} key
- * @param {Binding} child
- */
-
-p._addChild = function(key, child) {
-  child = child || new Binding()
-  this.[key] = child
-  return child
-}
 
 /**
  * Add a directive subscriber.
@@ -34,8 +20,8 @@ p._addChild = function(key, child) {
  * @param {Directive} sub
  */
 
-p._addSub = function (sub) {
-  this._subs.push(sub)
+p.addSub = function (sub) {
+  this.subs.push(sub)
 }
 
 /**
@@ -44,18 +30,21 @@ p._addSub = function (sub) {
  * @param {Directive} sub
  */
 
-p._removeSub = function (sub) {
-  this._subs.splice(this._subs.indexOf(sub), 1)
+p.removeSub = function (sub) {
+  if (this.subs.length) {
+    var i = this.subs.indexOf(sub)
+    if (i > -1) this.subs.splice(i, 1)
+  }
 }
 
 /**
  * Notify all subscribers of a new value.
  */
 
-p._notify = function () {
-  var i = this._subs.length
-  while(i--) {
-    this._subs[i].update()
+p.notify = function () {
+  var i = this.subs.length
+  while (i--) {
+    this.subs[i].update()
   }
 }
 

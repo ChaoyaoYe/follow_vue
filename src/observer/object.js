@@ -12,13 +12,8 @@ var objectAgumentations = Object.create(Object.prototype)
 
 function $add (key, val) {
   if (this.hasOwnProperty(key)) return
-  // make sure it's defined on itself.
-  _.define(this, key, val, true)
-  var ob = this.__ob__
-  ob.observe(key, val)
-  ob.convert(key, val)
-  ob.emit('add:self', key, val)
-  ob.propagate('add', key, val)
+  this.__ob__.convert(key, val)
+  this.__ob__.binding.notify()
 }
 
 /**
@@ -32,9 +27,7 @@ function $add (key, val) {
 function $delete (key) {
   if (!this.hasOwnProperty(key)) return
   delete this[key]
-  var ob = this.__ob__
-  ob.emit('delete:self', key)
-  ob.propagate('delete', key)
+  this.__ob__.binding.notify()
 }
 
 if (_.hasProto) {

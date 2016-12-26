@@ -99,7 +99,7 @@ describe('Directive', function () {
     def.isFn = true
     var d = new Directive('test', el, vm, {
       expression: 'a++'
-    })
+    }, def)
     expect(d._watcher).toBeUndefined()
     expect(d.bind).toHaveBeenCalled()
     var wrappedFn = d.update.calls.argsFor(0)[0]
@@ -136,14 +136,33 @@ describe('Directive', function () {
     })
   })
 
-  it('invalid dynamic literal', function () {
-    var _ = Vue.util
-    spyOn(_, 'warn')
-    def.isLiteral = true
-    new Directive('test', el, vm, {
-      expression: 'abc {{a}}'
+  it('function def', function () {
+    var d = new Directive('test', el, vm, {
+      expression: 'a'
+    }, def.update)
+    expect(d.update).toBe(def.update)
+    expect(def.update).toHaveBeenCalled()
+  })
+
+  it('reuse the same watcher', function (done) {
+    var d = new Directive('test', el, vm, {
+      expression: 'a',
     }, def)
-    expect(_.warn).toHaveBeenCalled()
+    var d2 = new Directive('test', el, vm, {
+      expression: 'a',
+    }, def)
+    expect(vm._watcherList.length).toBe(1)
+    expect(d._watcher).toBe(d2._watcher)
+    d2._teardown()
+    expect(d2._watcher).toBeNull()
+    expect(vm._watcherList.length).toBe(1)
+    vm.a = 2
+    nextTick(function () {
+      expect(def.update).toHaveBeenCalledWith(2, 1)
+      d._teardown()
+      expect(vm._watcherList.length).toBe(0)
+      done()
+    })
   })
 
 })

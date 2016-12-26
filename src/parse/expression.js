@@ -3,32 +3,36 @@ var Path = require('./path')
 var Cache = require('../cache')
 var expressionCache = new Cache(1000)
 
+var keywords =
+  'Math,break,case,catch,continue,debugger,default,' +
+  'delete,do,else,false,finally,for,function,if,in,' +
+  'instanceof,new,null,return,switch,this,throw,true,try,' +
+  'typeof,var,void,while,with,undefined,abstract,boolean,' +
+  'byte,char,class,const,double,enum,export,extends,' +
+  'final,float,goto,implements,import,int,interface,long,' +
+  'native,package,private,protected,public,short,static,' +
+  'super,synchronized,throws,transient,volatile,' +
+  'arguments,let,yield'
+
 var wsRE = /\s/g
 var newlineRE = /\n/g
 var saveRE = /[\{,]\s*[\w\$_]+\s*:|'[^']*'|"[^"]*"/g
 var restoreRE = /"(\d+)"/g
 var pathTestRE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\])*$/
 var pathReplaceRE = /[^\w$\.]([A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*|\['.*?'\]|\[".*?"\])*)/g
-var keywords = 'Math,break,case,catch,continue,debugger,default,delete,do,else,false,finally,for,function,if,in,instanceof,new,null,return,switch,this,throw,true,try,typeof,var,void,while,with,undefined,abstract,boolean,byte,char,class,const,double,enum,export,extends,final,float,goto,implements,import,int,interface,long,native,package,private,protected,public,short,static,super,synchronized,throws,transient,volatile,arguments,let,yield'
 var keywordsRE = new RegExp('^(' + keywords.replace(/,/g, '\\b|') + '\\b)')
-// note the following regex is only used on valid paths
-// so no need to exclude number for first char
-var rootPathRE = /^[\w$]+/
-var rootPathTestRE = /^[\w$]+$/
 
 /**
  * Save / Rewrite / Restore
  *
- * When rewriting paths found in an expression, it is possible
- * for the same letter sequences to be found in strings and Object
- * literal property keys. Therefore we remove and store these
- * parts in a temporary array, and restore them after the path
- * rewrite.
+ * When rewriting paths found in an expression, it is
+ * possible for the same letter sequences to be found in
+ * strings and Object literal property keys. Therefore we
+ * remove and store these parts in a temporary array, and
+ * restore them after the path rewrite.
  */
 
 var saved = []
-var paths = []
-var has = null
 
 /**
  * Save replacer
@@ -59,15 +63,6 @@ function rewrite (raw) {
     path = path.indexOf('"') > -1
       ? path.replace(restoreRE, restore)
       : path
-    // we store root level paths e.g. "a"
-    // so that the owner directive can add
-    // them as default dependencies.
-    var match = path.match(rootPathRE)
-    var rootPath = match && match[0]
-    if(rootPath && ! has[rootPath]){
-      paths.push(rootPath)
-      has[rootPath] = true
-    }
     return c + 'scope.' + path
   }
 }
@@ -85,8 +80,8 @@ function restore (str, i) {
 }
 
 /**
- * Rewrite an expression, prefixing all path accessors with `scope.`
- * and generate getter/setter functions.
+ * Rewrite an expression, prefixing all path accessors with
+ * `scope.` and generate getter/setter functions.
  *
  * @param {String} exp
  * @param {Boolean} needSet
@@ -96,8 +91,6 @@ function restore (str, i) {
 function compileExpFns (exp, needSet) {
   // reset state
   saved.length = 0
-  paths = []
-  has = {}
   // save strings and object literal keys
   var body = exp
     .replace(saveRE, save)
@@ -110,11 +103,9 @@ function compileExpFns (exp, needSet) {
   var getter = makeGetter(body)
   if (getter) {
     return {
-      computed : true,
-      get      : getter,
-      body     : body,
-      paths    : paths,
-      set      : needSet
+      get: getter,
+      body: body,
+      set: needSet
         ? makeSetter(body)
         : null
     }
@@ -142,19 +133,17 @@ function compilePathFns (exp) {
   return {
     get: getter,
     // always generate setter for simple paths
-    set: function(obj, val){
+    set: function (obj, val) {
       Path.set(obj, path, val)
-    },
-    // save root path segment
-    paths: [exp.match(rootPathRE)[0]]
+    }
   }
 }
 
 /**
  * Build a getter function. Requires eval.
  *
- * We isolate the try/catch so it doesn't affect the optimization
- * of the parse function when it is not called.
+ * We isolate the try/catch so it doesn't affect the
+ * optimization of the parse function when it is not called.
  *
  * @param {String} body
  * @return {Function|undefined}
@@ -162,9 +151,15 @@ function compilePathFns (exp) {
 
 function makeGetter (body) {
   try {
-    return new Function('scope', 'return ' + body + ';')
+    return new Function(
+      'scope',
+      '"use strict";try{return ' + body + '}catch(e){};'
+    )
   } catch (e) {
-    _.warn('Invalid expression. Generated function body: ' + body)
+    _.warn(
+      'Invalid expression. ' +
+      'Generated function body: ' + body
+    )
   }
 }
 
@@ -186,8 +181,9 @@ function makeSetter (body) {
   try {
     return new Function(
       'scope',
-       'try{return' + body + '}catch(e){};'
-     )
+      'value',
+      '"use strict";'+ body + ' = value;'
+    )
   } catch (e) {
     _.warn('Invalid setter function body: ' + body)
   }
@@ -206,7 +202,7 @@ function checkSetter (hit) {
 }
 
 /**
- * Parse an expression and rewrite into a getter/setter functions
+ * Parse an expression into re-written getter/setters.
  *
  * @param {String} exp
  * @param {Boolean} needSet
@@ -223,9 +219,9 @@ exports.parse = function (exp, needSet) {
     }
     return hit
   }
-  // we do a simple path check to optimize for that scenario.
-  // the check fails valid paths with unusal whitespaces, but
-  // that's too rare and we don't care.
+  // we do a simple path check to optimize for them.
+  // the check fails valid paths with unusal whitespaces,
+  // but that's too rare and we don't care.
   var res = pathTestRE.test(exp)
     ? compilePathFns(exp)
     : compileExpFns(exp, needSet)

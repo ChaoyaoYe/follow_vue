@@ -14,6 +14,7 @@
 - [Events API change](#events-api-change)
 - [Two Way filters](#two-way-filters)
 - [Block logic control](#block-logic-control)
+- [Misc](#misc)
 
 ## Instantiation process
 
@@ -35,11 +36,11 @@ var vm = new Vue({ el: '#app', data: {a: 1} })
 
 In the previous version, nested Vue instances do not have prototypal inheritance of their data scope. Although you can access parent data properties in templates, you need to explicitly travel up the scope chain with `this.$parent` in JavaScript code or use `this.$get()` to get a property on the scope chain. The expression parser also needs to do a lot of dirty work to determine the correct scope the variables belong to.
 
-In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! This is one of the major gotchas in Angular. If you are somewhat familiar with how prototype inehritance works, you might be surprised how this is possible. Well, the reason is that all data properties in Vue are getter/setters, and invoking a setter will not cause the child scope shadowing parent scopes. See the example [here](http://jsfiddle.net/yyx990803/Px2n6/).
+In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! Because all data properties in Vue are getter/setters, so setting a property with the same key as parent on a child will not cause the child scope to create a new property shadowing the parent one, but rather it will just invoke the parent's setter function. See the example [here](http://jsfiddle.net/yyx990803/Px2n6/).
 
 The result of this model is a much cleaner expression evaluation implementation. All expressions can simply be evaluated against the vm.
 
-You can also pass in `isolated: true` to avoid inheriting a parent scope, which can provide encapsulation for reusable components and improve performance.
+By default, all child components **DO NOT** inherit the parent scope. Only anonymous instances created in `v-repeat` and `v-if` inherit parent scope by default. This avoids accidentally falling through to parent properties when you didn't mean to. If you want your component to explicitly inherit parent scope, use the `inherit:true` option.
 
 ## Instance Option changes
 
@@ -82,19 +83,31 @@ You can also pass in `isolated: true` to avoid inheriting a parent scope, which 
       },
       greeting: function (msg) {
         console.log(msg)
+      },
+      // can also use a string for methods
+      bye: 'sayGoodbye'
+    },
+    methods: {
+      sayGoodbye: function () {
+        console.log('goodbye!')
       }
     }
   })
   // -> created!
   vm.$emit('greeting', 'hi!')
   // -> hi!
+  vm.$emit('bye')
+  // -> goodbye!
   ```
 
-- #### new option: `isolated`.
+- #### new option: `inherit`.
 
   Default: `false`.
 
-  Whether to inherit parent scope data. Set it to `true` if you want to create a component that have an isolated scope of its own. An isolated scope means you won't be able to bind to data on parent scopes in the component's template.
+  Whether to inherit parent scope data. Set it to `true` if you want to create a component that inherits parent scope. By default, inside a component's template you won't be able to bind to data on parent scopes. When this is set to `true`, you will be able to:
+
+  1. bind to parent scope properties in the component template
+  2. directly access parent properties on the component instance itself, via prototypal inheritance.
 
 - #### removed options:
 
@@ -121,7 +134,7 @@ You can also pass in `isolated: true` to avoid inheriting a parent scope, which 
 
   - #### hook usage change: `created`
 
-    This is now called before anything happens to the instance, with only `this.$data` being available, but **not observed** yet. In the past you can do `this.something = 1` to define default data, but it required some weird hack to make it work. Now you should just explicitly do `this.$data.something = 1` to define your instance default data.
+    In the past, you could do `this.something = 1` inside the `created` hook to add observed data to the instance. Now the hook is called after the data observation, so if you wish to add additional data to the instance you should use the new `$add` and `$delete` API methods.
 
   - #### hook usage change: `ready`
 
@@ -238,11 +251,67 @@ computed: {
 
     `v-model` now will check `lazy` attribute for lazy model update, and will check `number` attribute to know if it needs to convert the value into Numbers before writing back to the model.
 
-    When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array of strings to use as its options.
+    When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array to use as its options. The Array can contain plain strings, or contain objects for `<optgroups>`:
+
+    ``` js
+    [
+      { label: 'A', options: ['a', 'b']},
+      { label: 'B', options: ['c', 'd']}
+    ]
+    ```
+
+    Will render:
+
+    ``` html
+    <select>
+      <optgroup label="A">
+        <option>a</option>
+        <option>b</option>
+      </optgroup>
+      <optgroup label="B">
+        <option>c</option>
+        <option>d</option>
+      </optgroup>
+    </select>
+    ```
 
   - `v-component`
 
     When used as a dynamic component, it will check for the `keep-alive` attribute. When `keep-alive` is present, already instantiated components will be cached. This is useful when you have large, nested view components and want to maintain the state when switching views.
+
+  - `v-repeat`
+
+    One of the questions I've asked about is how `v-repeat` does the array diffing and what happens if we swap the array with a fresh array grabbed from an API end point. In 0.10 because the objects are different, all instances have to been re-created. In 0.11 we introduce the `trackby` attribute param. If each of your data objects in the array has a unique id, we can use that id to reuse existing instances when the array is swapped.
+
+    For example, if we have the data in the following format:
+
+    ``` js
+    items: [
+      { _id: 1, ... },
+      { _id: 2, ... },
+      { _id: 3, ... }
+    ]
+    ```
+
+    In your template you can do:
+
+    ``` html
+    <li v-repeat="items" trackby="_id">...</li>
+    ```
+
+    Later on when you swap `items` with a different array, even if the objects it contains are new, as long as they have the same trackby id we can still efficiently reuse existing instances.
+
+- #### Usage change for `v-with`
+
+  In 0.10 and earlier, `v-with` creates a two-way binding between the parent and child instance. In 0.11, it no longer creates a two-way binding but rather facilitates a unidirectional data flow from parent to child.
+
+  For example:
+
+  ``` html
+  <div v-component="test" v-with="childKey:parentKey">{{childKey}}</div>
+  ```
+
+  Here when you do `this.a = 123` in the child, the child's view will update, but the parent's scope will remain unaffected. When `parent.parentKey` changes again, it will overwrite `child.childKey`.
 
 - #### New directive option: `twoWay`
 
@@ -314,6 +383,11 @@ With `v-transition="my-transition"`, Vue will:
 
   ``` js
   Vue.transition('fade', {
+    beforeEnter: function (el) {
+      // a synchronous function called right before the
+      // element is inserted into the document.
+      // you can do some pre-styling here to avoid FOC.
+    },
     enter: function (el, done) {
       // element is already inserted into the DOM
       // call done when animation finishes.
@@ -421,3 +495,7 @@ Rendered result:
 <p>content-2</p>
 <!--v-block-end-->
 ```
+
+## Misc
+
+- When there are inline values on input elements bound with `v-model`, e.g. `<input value="hi" v-model="msg">`, the **inline value** will be used as the inital value. If the vm comes with default data, it **will be overwritten** by the inline value. Same for `selected` attribute on `<option>` elements.

@@ -28,6 +28,17 @@ exports.before = function (el, target) {
 }
 
 /**
+ * Append child to target
+ *
+ * @param {Element} el
+ * @param {Element} target
+ */
+
+exports.append = function(el, target) {
+  target.appendChild(el)
+}
+
+/**
  * Insert el after target
  *
  * @param {Element} el

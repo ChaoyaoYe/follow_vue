@@ -1,82 +1,20 @@
 var _ = require('../util')
-var Emitter = require('../emitter')
-var Observer = require('../observe/observer')
-var scopeEvents = ['set', 'mutate', 'add', 'delete']
-var allEvents = [
-  'get',
-  'set',
-  'mutate',
-  'add',
-  'delete',
-  'add:self',
-  'delete:self'
-]
-var proxyEvents = dataEvents.slice(0, 5)
+var Observer = require('../observer')
+var Binding = require('../binding')
 
 /**
- * Setup the data scope of an instance.
- *
- * We need to setup the instance $observer, which emits
- * data change events. The $observer relays events from
- * the $data's observer, because $data might be swapped
- * and the data observer might change.
- *
- * If the instance has a parent and is not isolated, we
- * also need to listen to parent scope events and propagate
- * changes down here.
+ * Setup the scope of an instance, which contains:
+ * - observed data
+ * - computed properties
+ * - user methods
+ * - meta properties
  */
 
 exports._initScope = function () {
-  this._initObserver()
   this._initData()
   this._initComputed()
   this._initMethods()
   this._initMeta()
-}
-
-/**
- * Teardown the scope.
- */
-
-exports._teardownScope = function () {
-  // turn of instance observer
-  this.$observer.off()
-  // stop relaying data events
-  var dataOb = this._data.__ob__
-  var proxies = this._dataProxies
-  var i = dataEvents.length
-  var event
-  while (i--) {
-    event = dataEvents[i]
-    dataOb.off(event, proxies[event])
-  }
-  dataOb.vmOwnerCount--
-  dataOb.tryRealease()
-  // unset data reference
-  this._data = this._dataProxies = null
-}
-
-/**
- * Setup the observer and data proxy handlers.
- */
-
-exports._initObserver = function () {
-  // create observer
-  var ob = this.$observer = new Emitter(this)
-  // setup data proxy handlers
-  var proxies = this._dataProxies = {}
-  proxyEvents.forEach(function (event) {
-    proxies[event] = function dataProxyFn (a, b, c) {
-      ob.emit(event, a, b, c)
-    }
-  })
-  var self = this
-  proxies['add:self'] = function dataProxyFn(key) {
-    self._proxy(key)
-  }
-  proxies['delete:self'] = function dataProxyFn(key) {
-    self._unproxy(key)
-  }
 }
 
 /**
@@ -88,19 +26,15 @@ exports._initData = function () {
   var data = this._data
   var keys = Object.keys(data)
   var i = keys.length
+  var key
   while (i--) {
-    this._proxy(keys[i])
+    key = keys[i]
+    if (!_.isReserved(key)) {
+      this._proxy(key)
+    }
   }
-  // relay data changes
-  var ob = Observer.create(data)
-  ob.vmOwnerCount++
-  var proxies = this._dataProxies
-  var event
-  i = dataEvents.length
-  while (i--) {
-    event = dataEvents[i]
-    ob.on(event, proxies[event])
-  }
+  // observe data
+  Observer.create(data)
 }
 
 /**
@@ -110,7 +44,6 @@ exports._initData = function () {
  */
 
 exports._setData = function (newData) {
-  var ob = this.$observer
   var oldData = this._data
   this._data = newData
   var keys, key, i
@@ -121,7 +54,6 @@ exports._setData = function (newData) {
     key = keys[i]
     if (!_.isReserved(key) && !(key in newData)) {
       this._unproxy(key)
-      ob.emit('delete', key)
     }
   }
   // proxy keys not already proxied,
@@ -130,33 +62,13 @@ exports._setData = function (newData) {
   i = keys.length
   while (i--) {
     key = keys[i]
-    if (this.hasOwnProperty(key)) {
-      // existing property, emit set if different
-      if (newData[key] !== oldData[key]) {
-        ob.emit('set', key, newData[key])
-      }
-    } else {
+    if (!this.hasOwnProperty(key) && !_.isReserved(key)) {
       // new property
       this._proxy(key)
-      ob.emit('add', key, newData[key])
     }
   }
-  // teardown/setup data proxies
-  var newOb = Observer.create(newData)
-  var oldOb = oldData.__ob__
-  var proxies = this._dataProxies
-  var event, proxy
-  i = dataEvents.length
-  while (i--) {
-    event = dataEvents[i]
-    proxy = proxies[event]
-    newOb.on(event, proxy)
-    oldOb.off(event, proxy)
-  }
-  newOb.vmOwnerCount++
-  oldOb.vmOwnerCount--
-  // memory managment, important!
-  oldOb.tryRelease()
+  Observer.create(newData)
+  this._digest()
 }
 
 /**
@@ -167,22 +79,20 @@ exports._setData = function (newData) {
  */
 
 exports._proxy = function (key) {
-  if (!_.isReserved(key)) {
-    // need to store ref to self here
-    // because these getter/setter might
-    // be called by child instances!
-    var self = this
-    Object.defineProperty(self, key, {
-      configurable: true,
-      enumerable: true,
-      get: function proxyGetter () {
-        return self._data[key]
-      },
-      set: function proxySetter (val) {
-        self._data[key] = val
-      }
-    })
-  }
+  // need to store ref to self here
+  // because these getter/setters might
+  // be called by child instances!
+  var self = this
+  Object.defineProperty(self, key, {
+    configurable: true,
+    enumerable: true,
+    get: function proxyGetter () {
+      return self._data[key]
+    },
+    set: function proxySetter (val) {
+      self._data[key] = val
+    }
+  })
 }
 
 /**
@@ -193,6 +103,28 @@ exports._proxy = function (key) {
 
 exports._unproxy = function (key) {
   delete this[key]
+}
+
+/**
+ * Force update on every watcher in scope.
+ */
+
+exports._digest = function () {
+  var i = this._watcherList.length
+  while (i--) {
+    this._watcherList[i].update()
+  }
+  var children = this._children
+  var child
+  if (children) {
+    i = children.length
+    while (i--) {
+      child = children[i]
+      if (!child.$options.isolated) {
+        child._digest()
+      }
+    }
+  }
 }
 
 /**
@@ -213,10 +145,10 @@ exports._initComputed = function () {
         }
       } else {
         def.get = def.get
-          ? _bind(def.get, this)
+          ? _.bind(def.get, this)
           : noop
         def.set = def.set
-          ? _bind(def.set, this)
+          ? _.bind(def.set, this)
           : noop
       }
       def.enumerable = true
@@ -242,14 +174,14 @@ exports._initMethods = function () {
 }
 
 /**
- * Initialize meta information like $index, $key & $value
+ * Initialize meta information like $index, $key & $value.
  */
 
-exports._initMeta = function(){
+exports._initMeta = function () {
   var metas = this.$options._meta
-  if(metas){
-    for(var key in metas) {
-      this._defineMeta(key, meta[key])
+  if (metas) {
+    for (var key in metas) {
+      this._defineMeta(key, metas[key])
     }
   }
 }
@@ -263,22 +195,21 @@ exports._initMeta = function(){
  */
 
 exports._defineMeta = function (key, value) {
-  var ob = this.$observer
+  var binding = new Binding()
   Object.defineProperty(this, key, {
     enumerable: true,
     configurable: true,
     get: function metaGetter () {
-      if (Observer.emitGet) {
-        ob.emit('get', key)
+      if (Observer.target) {
+        Observer.target.addDep(binding)
       }
       return value
     },
     set: function metaSetter (val) {
       if (val !== value) {
         value = val
-        ob.emit('set', key, val)
+        binding.notify()
       }
     }
   })
-  ob.emit('add', key, value)
 }

@@ -1,6 +1,7 @@
 var Vue = require('../../../src/vue')
 var nextTick = Vue.nextTick
 var Watcher = require('../../../src/watcher')
+var _ = Vue.util
 
 describe('Watcher', function () {
 
@@ -108,16 +109,41 @@ describe('Watcher', function () {
     })
   })
 
+  it('meta properties', function (done) {
+    vm._defineMeta('$index', 1)
+    var watcher = new Watcher(vm, '$index + 1', spy)
+    expect(watcher.value).toBe(2)
+    vm.$index = 2
+    nextTick(function () {
+      expect(watcher.value).toBe(3)
+      done()
+    })
+  })
+
   it('non-existent path, $add later', function (done) {
     var watcher = new Watcher(vm, 'd.e', spy)
     var watcher2 = new Watcher(vm, 'b.e', spy)
     expect(watcher.value).toBeUndefined()
     expect(watcher2.value).toBeUndefined()
+    // check $add affecting children
+    var child = vm.$addChild({
+      inherit: true
+    })
+    var watcher3 = new Watcher(child, 'd.e', spy)
+    var watcher4 = new Watcher(child, 'b.e', spy)
+    // check $add should not affect isolated children
+    var child2 = vm.$addChild()
+    var watcher5 = new Watcher(child2, 'd.e', spy)
+    expect(watcher5.value).toBeUndefined()
     vm.$add('d', { e: 123 })
     vm.b.$add('e', 234)
     nextTick(function () {
       expect(watcher.value).toBe(123)
       expect(watcher2.value).toBe(234)
+      expect(watcher3.value).toBe(123)
+      expect(watcher4.value).toBe(234)
+      expect(watcher5.value).toBeUndefined()
+      expect(spy.calls.count()).toBe(4)
       expect(spy).toHaveBeenCalledWith(123, undefined)
       expect(spy).toHaveBeenCalledWith(234, undefined)
       done()
@@ -136,12 +162,19 @@ describe('Watcher', function () {
   })
 
   it('swapping $data', function (done) {
+    // existing path
     var watcher = new Watcher(vm, 'b.c', spy)
+    var spy2 = jasmine.createSpy()
+    // non-existing path
+    var watcher2 = new Watcher(vm, 'e', spy2)
     expect(watcher.value).toBe(2)
-    vm.$data = { b: { c: 3}}
+    expect(watcher2.value).toBeUndefined()
+    vm.$data = { b: { c: 3}, e: 4 }
     nextTick(function () {
       expect(watcher.value).toBe(3)
+      expect(watcher2.value).toBe(4)
       expect(spy).toHaveBeenCalledWith(3, 2)
+      expect(spy2).toHaveBeenCalledWith(4, undefined)
       done()
     })
   })
@@ -166,21 +199,19 @@ describe('Watcher', function () {
     var oldData = vm.$data
     var watcher = new Watcher(vm, '$data', spy)
     expect(watcher.value).toBe(oldData)
-    vm.a = 2
-    nextTick(function () {
-      expect(spy).toHaveBeenCalledWith(oldData, oldData)
-      var newData = {}
-      vm.$data = newData
-      nextTick(function() {
-        expect(spy).toHaveBeenCalledWith(newData, oldData)
-        expect(watcher.value).toBe(newData)
-        done()
-      })
+    var newData = {}
+    vm.$data = newData
+    nextTick(function() {
+      expect(spy).toHaveBeenCalledWith(newData, oldData)
+      expect(watcher.value).toBe(newData)
+      done()
     })
   })
 
   it('watching parent scope properties', function (done) {
-    var child = vm.$addChild()
+    var child = vm.$addChild({
+      inherit: true
+    })
     var spy2 = jasmine.createSpy('watch')
     var watcher1 = new Watcher(child, '$data', spy)
     var watcher2 = new Watcher(child, 'a', spy2)
@@ -188,7 +219,7 @@ describe('Watcher', function () {
     nextTick(function () {
       // $data should only be called on self data change
       expect(watcher1.value).toBe(child.$data)
-      expect(spy.calls.count()).toBe(0)
+      expect(spy).not.toHaveBeenCalled()
       expect(watcher2.value).toBe(123)
       expect(spy2).toHaveBeenCalledWith(123, 1)
       done()
@@ -202,10 +233,11 @@ describe('Watcher', function () {
     vm.$options.filters.test2 = function (val, str) {
       return val + str
     }
-    var watcher = new Watcher(vm, 'b.c', spy, [
+    var filters = _.resolveFilters(vm, [
       { name: 'test', args: [3] },
       { name: 'test2', args: ['yo']}
     ])
+    var watcher = new Watcher(vm, 'b.c', spy, filters)
     expect(watcher.value).toBe('6yo')
     vm.b.c = 3
     nextTick(function () {
@@ -221,15 +253,16 @@ describe('Watcher', function () {
         return val > arg ? val : oldVal
       }
     }
-    var watcher = new Watcher(vm, 'b["c"]', spy, [
+    var filters = _.resolveFilters(vm, [
       { name: 'test', args: [5] }
-    ], true)
+    ])
+    var watcher = new Watcher(vm, 'b["c"]', spy, filters, true)
     expect(watcher.value).toBe(2)
     watcher.set(4) // shoud not change the value
     nextTick(function () {
       expect(vm.b.c).toBe(2)
       expect(watcher.value).toBe(2)
-      expect(spy.calls.count()).toBe(0)
+      expect(spy).not.toHaveBeenCalled()
       watcher.set(6)
       nextTick(function () {
         expect(vm.b.c).toBe(6)
@@ -279,7 +312,7 @@ describe('Watcher', function () {
     watcher.removeCb(spy)
     vm.a = 234
     nextTick(function () {
-      expect(spy.calls.count()).toBe(0)
+      expect(spy).not.toHaveBeenCalled()
       expect(spy2).toHaveBeenCalledWith(234, 1)
       done()
     })
@@ -293,7 +326,7 @@ describe('Watcher', function () {
       expect(watcher.active).toBe(false)
       expect(watcher.vm).toBe(null)
       expect(watcher.cbs).toBe(null)
-      expect(spy.calls.count()).toBe(0)
+      expect(spy).not.toHaveBeenCalled()
       done()
     })
   })

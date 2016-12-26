@@ -1,258 +1,34 @@
-/**
- * Test property proxy, scope inheritance,
- * data event propagation and data sync
- */
-
 var Vue = require('../../../../src/vue')
-var Observer = require('../../../../src/observe/observer')
-Observer.pathDelimiter = '.'
 
-function mockBinding () {
-  return {
-    _notify: jasmine.createSpy('binding')
-  }
-}
+describe('Instance Scope', function () {
 
-describe('Scope', function () {
-
-  describe('basic', function () {
-
-    var vm = new Vue({
-      data: {
-        a: 1,
-        b: {
-          c: 2
-        }
-      }
-    })
-
-    it('should proxy data properties', function () {
-      expect(vm.a).toBe(vm.$data.a)
-      expect(vm.b).toBe(vm.$data.b)
-    })
-
-    it('should trigger set events', function () {
-      var spy = jasmine.createSpy('basic')
-      vm.$observer.on('set', spy)
-      // simple
-      vm.a = 2
-      expect(spy.calls.count()).toBe(1)
-      expect(spy).toHaveBeenCalledWith('a', 2, undefined, undefined)
-      // nested path
-      vm.b.c = 3
-      expect(spy.calls.count()).toBe(2)
-      expect(spy).toHaveBeenCalledWith('b.c', 3, undefined, undefined)
-    })
-
-    it('should trigger add/delete events', function () {
-      var spy = jasmine.createSpy('instantiation')
-      vm.$observer
-        .on('add', spy)
-        .on('delete', spy)
-      // add
-      vm.$add('c', 123)
-      expect(spy.calls.count()).toBe(1)
-      expect(spy).toHaveBeenCalledWith('c', 123, undefined, undefined)
-      // delete
-      vm.$delete('c')
-      expect(spy.calls.count()).toBe(2)
-      expect(spy).toHaveBeenCalledWith('c', undefined, undefined, undefined)
-      // meta
-      vm._defineMeta('$index', 1)
-      expect(spy.calls.count()).toBe(3)
-      expect(spy).toHaveBeenCalledWith('$index', 1, undefined, undefined)
-    })
-
-  })
-
-  describe('data sync', function () {
+  describe('data proxy', function () {
 
     var data = {
-      a: 1,
-      b: {
-        c: 2
-      }
+      a: 0,
+      b: 0
     }
-
     var vm = new Vue({
       data: data
     })
 
-    it('should retain data reference', function () {
-      expect(vm.$data).toBe(data)
-    })
-
-    it('should sync set', function () {
-      // vm -> data
-      vm.a = 2
-      expect(data.a).toBe(2)
-      // data -> vm
-      data.b = {d:3}
+    it('initial', function () {
+      expect(vm.a).toBe(data.a)
       expect(vm.b).toBe(data.b)
     })
 
-    it('should sync add', function () {
-      // vm -> data
-      vm.$add('c', 123)
-      expect(data.c).toBe(123)
-      // data -> vm
-      data.$add('d', 456)
-      expect(vm.d).toBe(456)
+    it('vm => data', function () {
+      vm.a = 1
+      expect(data.a).toBe(1)
+      expect(vm.a).toBe(data.a)
     })
 
-    it('should sync delete', function () {
-      // vm -> data
-      vm.$delete('d')
-      expect(data.hasOwnProperty('d')).toBe(false)
-      // data -> vm
-      data.$delete('c')
-      expect(vm.hasOwnProperty('c')).toBe(false)
+    it('data => vm', function () {
+      data.b = 2
+      expect(vm.b).toBe(2)
+      expect(vm.b).toBe(data.b)
     })
 
-  })
-
-  describe('inheritance', function () {
-
-    var parent = new Vue({
-      data: {
-        a: 'parent a',
-        b: { c: 2 },
-        c: 'parent c',
-        arr: [{a:1},{a:2}]
-      }
-    })
-
-    var child = parent.$addChild({
-      data: {
-        a: 'child a'
-      }
-    })
-
-    it('child should inherit parent data on scope', function () {
-      expect(child.b).toBe(parent.b) // object
-      expect(child.c).toBe(parent.c) // primitive value
-    })
-
-    it('child should shadow parent property with same key', function () {
-      expect(parent.a).toBe('parent a')
-      expect(child.a).toBe('child a')
-    })
-
-    it('setting scope properties on child should affect parent', function () {
-      child.c = 'modified by child'
-      expect(parent.c).toBe('modified by child')
-    })
-
-    it('parent event should propagate when child has same binding', function () {
-      // object path
-      var b = child._bindings['b.c'] = mockBinding()
-      parent.b.c = 3
-      expect(b._notify).toHaveBeenCalled()
-      // array path
-      b = child._bindings['arr.0.a'] = mockBinding()
-      parent.arr[0].a = 2
-      expect(b._notify).toHaveBeenCalled()
-      // add
-      b = child._bindings['e'] = mockBinding()
-      parent.$add('e', 123)
-      expect(b._notify).toHaveBeenCalled()
-      // delete
-      b = child._bindings['e'] = mockBinding()
-      parent.$delete('e')
-      expect(b._notify).toHaveBeenCalled()
-    })
-
-    it('parent event should not propagate when child has shadowing key', function () {
-      var b = child._bindings['c'] = mockBinding()
-      child.$add('c', 123)
-      expect(b._notify.calls.count()).toBe(1)
-      parent.c = 456
-      expect(b._notify.calls.count()).toBe(1)
-    })
-
-  })
-
-  describe('inheritance with data sync on parent data', function () {
-
-    var parent = new Vue({
-      data: {
-        arr: [{a:1},{a:2}]
-      }
-    })
-
-    var child = parent.$addChild({
-      data: parent.arr[0]
-    })
-
-    it('should trigger proper events', function () {
-
-      var parentSpy = parent._bindings['arr.0.a'] = mockBinding()
-      var childSpy = child._bindings['arr.0.a'] = mockBinding()
-      var childSpy2 = child._bindings['a'] = mockBinding()
-      child.a = 3
-
-      // make sure data sync is working
-      expect(parent.arr[0].a).toBe(3)
-
-      expect(parentSpy._notify).toHaveBeenCalled()
-      expect(childSpy._notify).toHaveBeenCalled()
-      expect(childSpy2._notify).toHaveBeenCalled()
-    })
-
-  })
-
-  describe('swapping $data', function () {
-
-    var oldData = { a: 1, c: 4 }
-    var newData = { a: 2, b: 3 }
-    var vm = new Vue({
-      data: oldData
-    })
-    var vmSpy = jasmine.createSpy('vm')
-    var vmAddSpy = jasmine.createSpy('vmAdd')
-    var oldDataSpy = jasmine.createSpy('oldData')
-    vm.$observer.on('set', vmSpy)
-    vm.$observer.on('add', vmAddSpy)
-    oldData.__ob__.on('set', oldDataSpy)
-
-    vm.$data = newData
-
-    it('should sync new data', function () {
-      expect(vm._data).toBe(newData)
-      expect(vm.a).toBe(2)
-      expect(vm.b).toBe(3)
-      expect(vmSpy).toHaveBeenCalledWith('a', 2, undefined, undefined)
-      expect(vmAddSpy).toHaveBeenCalledWith('b', 3, undefined, undefined)
-    })
-
-    it('should unsync old data', function () {
-      expect(vm.hasOwnProperty('c')).toBe(false)
-      vm.a = 3
-      expect(oldDataSpy.calls.count()).toBe(0)
-      expect(oldData.a).toBe(1)
-      expect(newData.a).toBe(3)
-    })
-
-  })
-
-  describe('scope teardown', function () {
-    var parent = new Vue({
-      data: {
-        a: 123
-      }
-    })
-    var child = new Vue({
-      parent: parent
-    })
-    var spy = jasmine.createSpy('teardown')
-    child.$observer.on('set', spy)
-
-    it('should stop relaying parent events', function () {
-      child._teardownScope()
-      parent.a = 234
-      expect(spy.calls.count()).toBe(0)
-      expect(child._data).toBeNull()
-    })
   })
 
   describe('computed', function () {
@@ -297,7 +73,9 @@ describe('Scope', function () {
     })
 
     it('inherit', function () {
-      var child = vm.$addChild()
+      var child = vm.$addChild({
+        inherit: true
+      })
       expect(child.c).toBe('cd')
 
       child.d = 'e f'
@@ -329,8 +107,28 @@ describe('Scope', function () {
       })
       expect(vm.test()).toBe(1)
 
-      var child = vm.$addChild()
+      var child = vm.$addChild({
+        inherit: true
+      })
       expect(child.test()).toBe(1)
+    })
+
+  })
+
+  describe('meta', function () {
+
+    var vm = new Vue({
+      _meta: {
+        $index: 0,
+        $value: 'test'
+      }
+    })
+
+    it('should define metas only on vm', function () {
+      expect(vm.$index).toBe(0)
+      expect(vm.$value).toBe('test')
+      expect('$index' in vm.$data).toBe(false)
+      expect('$value' in vm.$data).toBe(false)
     })
 
   })

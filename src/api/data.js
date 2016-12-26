@@ -46,6 +46,10 @@ exports.$set = function (exp, val) {
 exports.$add = function (key, val) {
   if(!_.isReserved(key)){
     this._data.$add(key, val)
+    this._proxy(key)
+    this._digest()
+  }else{
+    _.warn('Refused to $add reserved key: ' + key)
   }
 }
 
@@ -59,6 +63,10 @@ exports.$add = function (key, val) {
 exports.$delete = function (key) {
   if(!_.isReserved(key)){
     this._data.$delete(key)
+    this.unproxy(key)
+    this._digest()
+  } else {
+    _.warn('Refused to $delete reserved key: ' + key)
   }
 }
 
@@ -154,6 +162,6 @@ exports.$interpolate = function (text) {
  */
 
 exports.$log = function (key) {
-  var data = this[key || '$data']
+  var data = this[key || '_data']
   console.log(JSON.parse(JSON.stringify(data)))
 }

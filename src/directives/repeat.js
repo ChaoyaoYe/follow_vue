@@ -29,6 +29,7 @@ module.exports = {
     this.checkIf()
     this.checkRef()
     this.checkComponent()
+    this.checkTrackById()
     // setup ref node
     this.ref = document.createComment('v-repeat')
     // cache for primitive value instances
@@ -82,12 +83,13 @@ module.exports = {
     var id = _.attr(this.el, 'component')
     if (!id) {
       this.Ctor = _.Vue // default constructor
+      this.inherit = true // inline repeats should inherit
     } else {
       var tokens = textParser.parse(id)
-      if (!tokens) { // static component /* fix token check when resolving component for v-repeat */
+      if (!tokens) { // static component
         var Ctor = this.Ctor = this.vm.$options.components[id]
         _.assertAsset(Ctor, 'component', id)
-        if(Ctor){
+        if (Ctor) {
           this.el = transclude(this.el, Ctor.options)
           this._linker = compile(this.el, Ctor.options)
         }
@@ -102,6 +104,19 @@ module.exports = {
           'in attribute bindings.'
         )
       }
+    }
+  },
+
+  /**
+   * Check for a track-by ID, which allows us to identify
+   * a piece of data and its associated instance by its
+   * unique id.
+   */
+
+  checkTrackById: function () {
+    this.idKey = this.el.getAttribute('trackby')
+    if (this.idKey !== null) {
+      this.el.removeAttribute('trackby')
     }
   },
 
@@ -145,10 +160,12 @@ module.exports = {
    */
 
   diff: function (data, oldVms) {
+    var idKey = this.idKey
     var converted = this.converted
+    var ref = this.ref
+    var alias = this.arg
     var init = !oldVms
     var vms = new Array(data.length)
-    var ref = this.ref
     var obj, raw, vm, i, l
     // First pass, go through the new Array and fill up
     // the new vms array. If a piece of data has a cached
@@ -163,6 +180,14 @@ module.exports = {
         vm.$index = i // update $index
         if (converted) {
           vm.$key = obj.key // update $key
+        }
+        if (idKey) { // swap track by id data
+          if (alias) {
+            console.log('reusing...')
+            vm[alias] = raw
+          } else {
+            vm._setData(raw)
+          }
         }
       } else { // new instance
         vm = this.build(obj, i)
@@ -232,7 +257,7 @@ module.exports = {
   build: function (data, index) {
     var original = data
     var meta = { $index: index }
-    if(this.converted){
+    if (this.converted) {
       meta.$key = original.key
     }
     var raw = this.converted ? data.value : data
@@ -240,9 +265,9 @@ module.exports = {
     var hasAlias = !isObject(raw) || alias
     // wrap the raw data with alias
     data = hasAlias ? {} : raw
-    if(alias){
+    if (alias) {
       data[alias] = raw
-    } else if(hasAlias){
+    } else if (hasAlias) {
       meta.$value = raw
     }
     // resolve constructor
@@ -250,9 +275,9 @@ module.exports = {
     var vm = this.vm.$addChild({
       el: this.el.cloneNode(true),
       _linker: this._linker,
-      _meta : meta,
+      _meta: meta,
       data: data,
-      parent: this.vm
+      inherit: this.inherit
     }, Ctor)
     // cache instance
     this.cacheVm(raw, vm)
@@ -270,8 +295,12 @@ module.exports = {
 
   resolveCtor: function (data) {
     var getter = expParser.parse(this.CtorExp).get
-    var context = Object.create(this.vm.$scope)
-    _.extend(context, data)
+    var context = Object.create(this.vm)
+    for (var key in data) {
+      // use _.define to avoid accidentally
+      // overwriting scope properties
+      _.define(context, key, data[key])
+    }
     var id = getter(context)
     var Ctor = this.vm.$options.components[id]
     _.assertAsset(Ctor, 'component', id)
@@ -298,7 +327,7 @@ module.exports = {
   },
 
   /**
-   * Cache a vm instance based on its data
+   * Cache a vm instance based on its data.
    *
    * If the data is an object, we save the vm's reference on
    * the data object as a hidden property. Otherwise we
@@ -310,24 +339,32 @@ module.exports = {
    */
 
   cacheVm: function (data, vm) {
-    if (isObject(data)) {
+    var idKey = this.idKey
+    var cache = this.cache
+    if (idKey) {
+      var id = data[idKey]
+      if (!cache[id]) {
+        cache[id] = vm
+      } else {
+        _.warn('Duplicate ID in v-repeat: ' + id)
+      }
+    } else if (isObject(data)) {
       var id = this.id
-      if(data.hasOwnProperty(id)){
-        if(data[id] === null){
+      if (data.hasOwnProperty(id)) {
+        if (data[id] === null) {
           data[id] = vm
-        }else{
+        } else {
           _.warn(
             'Duplicate objects are not supported in v-repeat.'
           )
         }
-      }else{
+      } else {
         _.define(data, this.id, vm)
       }
     } else {
-      var cache = this.cache
-      if(!cache[data]){
+      if (!cache[data]) {
         cache[data] = [vm]
-      }else{
+      } else {
         cache[data].push(vm)
       }
     }
@@ -342,17 +379,19 @@ module.exports = {
    */
 
   getVm: function (data) {
-    if(isObject(data)){
+    if (this.idKey) {
+      return this.cache[data[this.idKey]]
+    } else if (isObject(data)) {
       return data[this.id]
-    }else{
+    } else {
       var cached = this.cache[data]
-      if(cached){
+      if (cached) {
         var i = 0
         var vm = cached[i]
         // since duplicated vm instances might be reused
         // already, we need to return the first non-reused
         // instance.
-        while(vm && vm._reused){
+        while (vm && vm._reused) {
           vm = cached[++i]
         }
         return vm
@@ -368,7 +407,9 @@ module.exports = {
 
   uncacheVm: function (vm) {
     var data = vm._raw
-    if (isObject(data)) {
+    if (this.idKey) {
+      this.cache[data[this.idKey]] = null
+    } else if (isObject(data)) {
       data[this.id] = null
       vm._raw = null
     } else {

@@ -3,38 +3,42 @@ var compile = require('../compile/compile')
 var transclude = require('../compile/transclude')
 
 /**
- * Set instance target element and kick off the compilation process.
- * The passed in `el` can be a selector string, an existing Element,
- * or a DocumentFragment (for block instances).
+ * Set instance target element and kick off the compilation
+ * process. The passed in `el` can be a selector string, an
+ * existing Element, or a DocumentFragment (for block
+ * instances).
  *
  * @param {Element|DocumentFragment|string} el
  * @public
  */
 
 exports.$mount = function (el) {
-  if(this._isCompiled){
-    _.warn('$mount() should be called only once')
+  if (this._isCompiled) {
+    _.warn('$mount() should be called only once.')
     return
   }
-  this._callHook('beforeCompile')
   var options = this.$options
-  if(options._linker){
+  if (options._linker) {
     // pre-compiled linker. this means the element has
-    // beeen trancluded and compiled. just link it.
+    // been trancluded and compiled. just link it.
     this._initElement(el)
+    this._callHook('beforeCompile')
     options._linker(this, el)
   } else {
     el = transclude(el, options)
     this._initElement(el)
+    this._callHook('beforeCompile')
     var linker = compile(el, options)
     linker(this, el)
   }
   this._callHook('compiled')
-  if(_.inDoc(this.$el)){
-    this._callHook('atached')
+  if (_.inDoc(this.$el)) {
+    this._callHook('attached')
+    this._initDOMHooks()
     ready.call(this)
   } else {
-    this._emitter.once('hook:attached', ready)
+    this._initDOMHooks()
+    this.$once('hook:attached', ready)
   }
 }
 
@@ -45,8 +49,8 @@ exports.$mount = function (el) {
  * @param {Element} el
  */
 
-exports._initElement = function(el){
-  if(el instanceof DocumentFragment){
+exports._initElement = function (el) {
+  if (el instanceof DocumentFragment) {
     this._isBlock = true
     this.$el = this._blockStart = el.firstChild
     this._blockEnd = el.lastChild
@@ -58,14 +62,13 @@ exports._initElement = function(el){
 }
 
 /**
- * Mark an instance as ready
+ * Mark an instance as ready.
  */
 
-function ready(){
+function ready () {
   this._isAttached = true
   this._isReady = true
   this._callHook('ready')
-  this._initDOMHooks()
 }
 
 /**
@@ -82,7 +85,7 @@ exports.$destroy = function (remove) {
   }
   this._callHook('beforeDestroy')
   // remove DOM element
-  if (remove) {
+  if (remove && this.$el) {
     if (this.$el === document.body) {
       this.$el.innerHTML = ''
     } else {
@@ -98,40 +101,38 @@ exports.$destroy = function (remove) {
     parent._children.splice(i)
   }
   // destroy all children.
-  if(this._children){
+  if (this._children) {
     i = this._children.length
     while (i--) {
       this._children[i].$destroy()
     }
   }
-  // teardown data/scope
-  this._teardownScope()
-  // teardown all user watchers.
-  for(i in this._userWathers){
-    this._userWathers[i].teardown()
-  }
-  // teardown all directives. this also teardown all
+  // teardown all directives. this also tearsdown all
   // directive-owned watchers.
   i = this._directives.length
   while (i--) {
     this._directives[i]._teardown()
   }
-  // clear up
+  // teardown all user watchers.
+  for (i in this._userWatchers) {
+    this._userWatchers[i].teardown()
+  }
+  // clean up
+  if (this.$el) {
+    this.$el.__vue__ = null
+  }
   this._data =
   this._watchers =
-  this._userWathers =
-  this.activeWatcher =
+  this._userWatchers =
+  this._activeWatcher =
   this.$el =
-  this.$el.__vue__ =
   this.$parent =
-  this.$observer =
   this._children =
-  this.bindings =
+  this._bindings =
   this._directives = null
-  // call the last hook ...
+  // call the last hook...
   this._isDestroyed = true
-  this._callHook('afterDestroy')
-  // turn off all instance listeners
-  this._emitter.off()
-  this._emitter = null
+  this._callHook('destroyed')
+  // turn off all instance listeners.
+  this.$off()
 }
