@@ -10,7 +10,7 @@ var animDurationProp = _.animationProp + 'Duration'
 
 batcher._preFlush = function () {
   /* jshint unused: false */
-  var f = document.body.offsetHeight
+  var f = document.documentElement.offsetHeight
 }
 
 /**
@@ -18,18 +18,36 @@ batcher._preFlush = function () {
  * calculated styles
  *
  * @param {Element} el
+ * @param {Object} data
+ * @param {String} className
  * @return {Number}
  *         1 - transition
  *         2 - animation
  */
 
-function getTransitionType (el) {
-  var styles = window.getComputedStyle(el)
-  if (styles[transDurationProp] !== '0s') {
-    return 1
-  } else if (styles[animDurationProp] !== '0s') {
-    return 2
+function getTransitionType (el, data, className) {
+  var type = data.cache && data.cache[className]
+  if (type) return type
+  var inlineStyles = el.style
+  var computedStyles = window.getComputedStyle(el)
+  var transDuration =
+    inlineStyles[transDurationProp] ||
+    computedStyles[transDurationProp]
+  if (transDuration && transDuration !== '0s') {
+    type = 1
+  } else {
+    var animDuration =
+      inlineStyles[animDurationProp] ||
+      computedStyles[animDurationProp]
+    if (animDuration && animDuration !== '0s') {
+      type = 2
+    }
   }
+  if (type) {
+    if (!data.cache) data.cache = {}
+    data.cache[className] = type
+  }
+  return type
 }
 
 /**
@@ -41,38 +59,43 @@ function getTransitionType (el) {
  * @param {Object} data - target element's transition data
  */
 
-module.exports = function (el, direction, op, data) {
+module.exports = function (el, direction, op, data, cb) {
   var classList = el.classList
-  var callback = data.callback
   var prefix = data.id || 'v'
   var enterClass = prefix + '-enter'
   var leaveClass = prefix + '-leave'
-  // clean up potential previously running transitions
+  // clean up potential previous unfinished transition
   if (data.callback) {
-    _.off(el, data.event, callback)
+    _.off(el, data.event, data.callback)
     classList.remove(enterClass)
     classList.remove(leaveClass)
     data.event = data.callback = null
   }
   var transitionType, onEnd, endEvent
-
   if (direction > 0) { // enter
-
+    // Enter Transition
     classList.add(enterClass)
     op()
-    transitionType = getTransitionType(el)
+    transitionType = getTransitionType(el, data, enterClass)
     if (transitionType === 1) {
-      // Enter Transition
-      //
-      // We need to force a reflow to have the enterClass
-      // applied before removing it to trigger the
-      // transition, so they are batched to make sure
-      // there's only one reflow for everything.
       batcher.push({
         run: function () {
           classList.remove(enterClass)
         }
       })
+      // only listen for transition end if user has sent
+      // in a callback
+      if (cb) {
+        endEvent = data.event = _.transitionEndEvent
+        onEnd = data.callback = function transitionCb (e) {
+          if (e.target === el) {
+            _.off(el, endEvent, onEnd)
+            data.event = data.callback = null
+            cb()
+          }
+        }
+        _.on(el, endEvent, onEnd)
+      }
     } else if (transitionType === 2) {
       // Enter Animation
       //
@@ -80,48 +103,52 @@ module.exports = function (el, direction, op, data) {
       // element is inserted into the DOM, so we just
       // listen for the animationend event.
       endEvent = data.event = _.animationEndEvent
-      onEnd = data.callback = function (e) {
+      onEnd = data.callback = function transitionCb (e) {
         if (e.target === el) {
           _.off(el, endEvent, onEnd)
           data.event = data.callback = null
           classList.remove(enterClass)
+          if (cb) cb()
         }
       }
       _.on(el, endEvent, onEnd)
+    } else {
+      // no transition applicable
+      classList.remove(enterClass)
+      if (cb) cb()
     }
 
   } else { // leave
 
-    transitionType = getTransitionType(el)
-    if (
-      transitionType &&
-      (el.offsetWidth || el.offsetHeight)
-    ) {
-      // Leave Transition/Animation
-      //
-      // We push it to the batcher to ensure it triggers
-      // in the same frame with other enter transitions
-      // happening at the same time.
-      batcher.push({
-        run: function () {
-          classList.add(leaveClass)
-        }
-      })
+    classList.add(leaveClass)
+    transitionType = getTransitionType(el, data, leaveClass)
+    if (transitionType) {
+      if (transitionType === 1) {
+        classList.remove(leaveClass)
+        batcher.push({
+          run: function () {
+            classList.add(leaveClass)
+          }
+        })
+      }
       endEvent = data.event = transitionType === 1
         ? _.transitionEndEvent
         : _.animationEndEvent
-      onEnd = data.callback = function (e) {
+      onEnd = data.callback = function transitionCb (e) {
         if (e.target === el) {
           _.off(el, endEvent, onEnd)
           data.event = data.callback = null
           // actually remove node here
           op()
           classList.remove(leaveClass)
+          if (cb) cb()
         }
       }
       _.on(el, endEvent, onEnd)
     } else {
       op()
+      classList.remove(leaveClass)
+      if (cb) cb()
     }
 
   }

@@ -1,6 +1,5 @@
 var _ = require('../util')
 var config = require('../config')
-var Direcitve = require('../directive')
 var textParser = require('../parse/text')
 var dirParser = require('../parse/directive')
 var templateParser = require('../parse/template')
@@ -18,14 +17,11 @@ function noop () {}
  * @return {Function}
  */
 
-var compile = module.exports = function (el, options) {
-  // for template tags, what we want is its content as
-  // a documentFragment (for block instances)
-  if (el.tagName === 'TEMPLATE') {
-    el = el.content instanceof DocumentFragment
-      ? el.content
-      : templateParser.parse(el.innerHTML)
-  }
+module.exports = function compile (el, options) {
+  var params = options.paramAttributes
+  var paramsLinkFn = params
+    ? compileParamAttributes(el, params, options)
+    : null
   var nodeLinkFn = el instanceof DocumentFragment
     ? null
     : compileNode(el, options)
@@ -34,10 +30,6 @@ var compile = module.exports = function (el, options) {
     el.hasChildNodes()
       ? compileNodeList(el.childNodes, options)
       : null
-  var params = options.paramAttributes
-  var paramsLinkFn = params
-    ? compileParamAttributes(el, params, options)
-    : null
   return function link (vm, el) {
     if (paramsLinkFn) paramsLinkFn(vm, el)
     if (nodeLinkFn) nodeLinkFn(vm, el)
@@ -112,23 +104,17 @@ function makeDirectivesLinkFn (directives) {
   return function directivesLinkFn (vm, el) {
     // reverse apply because it's sorted low to high
     var i = directives.length
-    var vmDirs = vm._directives
     var dir, j
     while (i--) {
       dir = directives[i]
-      if (dir.oneTime) {
-        // one time attr interpolation
-        el.setAttribute(
-          dir.name,
-          vm.$eval(dir.value)
-        )
+      if (dir._link) {
+        // custom link fn
+        dir._link(vm, el)
       } else {
         j = dir.descriptors.length
         while (j--) {
-          vmDirs.push(
-            new Direcitve(dir.name, el, vm,
-                          dir.descriptors[j], dir.def)
-          )
+          vm._bindDir(dir.name, el,
+                      dir.descriptors[j], dir.def)
         }
       }
     }
@@ -169,7 +155,10 @@ function compileTextNode (node, options) {
           token.def = dirs.partial
           token.descriptor = dirParser.parse(value)[0]
         } else {
-          el = document.createTextNode('')
+          // IE will clean up empty textNodes during
+          // frag.cloneNode(true), so we have to give it
+          // something here...
+          el = document.createTextNode(' ')
           token.type = 'text'
           token.def = dirs.text
           token.descriptor = dirParser.parse(value)[0]
@@ -194,7 +183,6 @@ function makeTextNodeLinkFn (tokens, frag) {
   return function textNodeLinkFn (vm, el) {
     var fragClone = frag.cloneNode(true)
     var childNodes = _.toArray(fragClone.childNodes)
-    var dirs = vm._directives
     var token, value, node
     for (var i = 0, l = tokens.length; i < l; i++) {
       token = tokens[i]
@@ -209,10 +197,8 @@ function makeTextNodeLinkFn (tokens, frag) {
             node.nodeValue = value
           }
         } else {
-          dirs.push(
-            new Direcitve(token.type, node, vm,
-                          token.descriptor, token.def)
-          )
+          vm._bindDir(token.type, node,
+                      token.descriptor, token.def)
         }
       }
     }
@@ -304,6 +290,7 @@ function compileParamAttributes (el, attrs, options) {
             '\nDon\'t mix binding tags with plain text ' +
             'in param attribute bindings.'
           )
+          continue
         } else {
           param.dynamic = true
           param.value = tokens[0].value
@@ -324,7 +311,7 @@ function compileParamAttributes (el, attrs, options) {
  */
 
 function makeParamsLinkFn (params, options) {
-  var def = options.directives.with
+  var def = options.directives['with']
   return function paramsLinkFn (vm, el) {
     var i = params.length
     var param
@@ -332,15 +319,13 @@ function makeParamsLinkFn (params, options) {
       param = params[i]
       if (param.dynamic) {
         // dynamic param attribtues are bound as v-with.
-        // we can directly fake the descriptor here beacuse
+        // we can directly duck the descriptor here beacuse
         // param attributes cannot use expressions or
         // filters.
-        vm._directives.push(
-          new Direcitve('with', el, vm, {
-            arg: param.name,
-            expression: param.value
-          }, def)
-        )
+        vm._bindDir('with', el, {
+          arg: param.name,
+          expression: param.value
+        }, def)
       } else {
         // just set once
         vm.$set(param.name, param.value)
@@ -358,7 +343,7 @@ function makeParamsLinkFn (params, options) {
  * @return {Function} terminalLinkFn
  */
 
-var terminalDirecitves = [
+var terminalDirectives = [
   'repeat',
   'component',
   'if'
@@ -371,7 +356,7 @@ function checkTerminalDirectives (el, options) {
   var value, dirName
   /* jshint boss: true */
   for (var i = 0; i < 3; i++) {
-    dirName = terminalDirecitves[i]
+    dirName = terminalDirectives[i]
     if (value = _.attr(el, dirName)) {
       return makeTeriminalLinkFn(el, dirName, value, options)
     }
@@ -391,17 +376,8 @@ function checkTerminalDirectives (el, options) {
 function makeTeriminalLinkFn (el, dirName, value, options) {
   var descriptor = dirParser.parse(value)[0]
   var def = options.directives[dirName]
-  if (
-    dirName === 'repeat' &&
-    !el.hasAttribute(config.prefix + 'component')
-  ) {
-    // optimize for simple repeats
-    var linker = compile(el, options)
-  }
   return function terminalLinkFn (vm, el) {
-    vm._directives.push(
-      new Direcitve(dirName, el, vm, descriptor, def, linker)
-    )
+    vm._bindDir(dirName, el, descriptor, def)
   }
 }
 
@@ -462,20 +438,26 @@ function collectDirectives (el, options) {
 function collectAttrDirective (el, name, value, options) {
   var tokens = textParser.parse(value)
   if (tokens) {
-    if (tokens.length === 1 && tokens[0].oneTime) {
-      return {
-        name: name,
-        value: tokens[0].value,
-        def: options.directives.attr,
-        oneTime: true
+    var def = options.directives.attr
+    var i = tokens.length
+    var allOneTime = true
+    while (i--) {
+      var token = tokens[i]
+      if (token.tag && !token.oneTime) {
+        allOneTime = false
       }
-    } else {
-      value = textParser.tokensToExp(tokens)
-      return {
-        name: 'attr',
-        def: options.directives.attr,
-        descriptors: dirParser.parse(name + ':' + value)
-      }
+    }
+    return {
+      def: def,
+      _link: allOneTime
+        ? function (vm, el) {
+            el.setAttribute(name, vm.$interpolate(value))
+          }
+        : function (vm, el) {
+            var value = textParser.tokensToExp(tokens, vm)
+            var desc = dirParser.parse(name + ':' + value)[0]
+            vm._bindDir('attr', el, desc, def)
+          }
     }
   }
 }

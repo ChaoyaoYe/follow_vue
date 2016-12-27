@@ -36,7 +36,7 @@ var vm = new Vue({ el: '#app', data: {a: 1} })
 
 In the previous version, nested Vue instances do not have prototypal inheritance of their data scope. Although you can access parent data properties in templates, you need to explicitly travel up the scope chain with `this.$parent` in JavaScript code or use `this.$get()` to get a property on the scope chain. The expression parser also needs to do a lot of dirty work to determine the correct scope the variables belong to.
 
-In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! Because all data properties in Vue are getter/setters, so setting a property with the same key as parent on a child will not cause the child scope to create a new property shadowing the parent one, but rather it will just invoke the parent's setter function. See the example [here](http://jsfiddle.net/yyx990803/Px2n6/).
+In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! Because all data properties in Vue are getter/setters, so setting a property with the same key as parent on a child will not cause the child scope to create a new property shadowing the parent one, but rather it will just invoke the parent's setter function. See the example [here](http://jsfiddle.net/Px2n6/2/).
 
 The result of this model is a much cleaner expression evaluation implementation. All expressions can simply be evaluated against the vm.
 
@@ -108,6 +108,22 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
 
   1. bind to parent scope properties in the component template
   2. directly access parent properties on the component instance itself, via prototypal inheritance.
+
+- #### new option: `mixins`.
+
+  The `mixins` option accepts an array of mixin objects. These mixin objects can contain instance options just like normal instance objects, and they will be merged against the eventual options using the same merge logic in `Vue.extend`. e.g. If your mixin contains a `created` hook and the component itself also has one, both functions will be called.
+
+  ``` js
+  var mixin = {
+    created: function () { console.log(2) }
+  }
+  var vm = new Vue({
+    created: function () { console.log(1) },
+    mixins: [mixin]
+  })
+  // -> 1
+  // -> 2
+  ```
 
 - #### removed options:
 
@@ -313,11 +329,15 @@ computed: {
 
   Here when you do `this.a = 123` in the child, the child's view will update, but the parent's scope will remain unaffected. When `parent.parentKey` changes again, it will overwrite `child.childKey`.
 
+- #### New directive: `v-el`
+
+  Similar to `v-ref`, but instead stores a reference to a DOM Node in `vm.$$`. For the reasoning behind the addition see [this thread](https://github.com/yyx990803/vue/issues/404#issuecomment-53566116).
+
 - #### New directive option: `twoWay`
 
   This option indicates the directive is two-way and may write back to the model. Allows the use of `this.set(value)` inside directive functions.
 
-- #### (Breaking) Removed directive option: `isEmpty`
+- #### Removed directive option: `isEmpty`
 
 ## Interpolation change
 
@@ -360,6 +380,10 @@ Vue.config.debug = true
   ```
 
   * Note you still cannot use `<` or `>` in delimiters because Vue uses DOM-based templating.
+
+- #### New config option: `proto`
+
+  Be default, Vue.js alters observed data objects' `__proto__` when available for faster method interception/augmentation. This is perfectly fine when your data objects are plain JSON-derived objects. However if you want to use Vue's observation on object created with custom prototypes (e.g. from constructors), you can set `Vue.config.proto = false` to prohibit this behavior.
 
 ## Transition API Change
 

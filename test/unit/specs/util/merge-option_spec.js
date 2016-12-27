@@ -33,6 +33,12 @@ describe('Util - Option merging', function () {
     expect(res.length).toBe(2)
     expect(res[0]).toBe(fn1)
     expect(res[1]).toBe(fn2)
+    // both arrays
+    res = merge({paramAttributes: [1]}, {paramAttributes: [2]}).paramAttributes
+    expect(Array.isArray(res)).toBe(true)
+    expect(res.length).toBe(2)
+    expect(res[0]).toBe(1)
+    expect(res[1]).toBe(2)
   })
 
   it('events', function () {
@@ -189,6 +195,22 @@ describe('Util - Option merging', function () {
     )
     expect(res.data.a).toBe(2)
     expect(res.data.b).toBe(2)
+  })
+
+  it('mixins', function () {
+    var a = {}, b = {}, c = {}, d = {}
+    var mixinA = { a: 1, directives: { a: a } }
+    var mixinB = { b: 1, directives: { b: b } }
+    var res = merge(
+      { a: 2, directives: { c: c } },
+      { directives: { d: d }, mixins: [mixinA, mixinB] }
+    )
+    expect(res.a).toBe(1)
+    expect(res.b).toBe(1)
+    expect(res.directives.a).toBe(a)
+    expect(res.directives.b).toBe(b)
+    expect(res.directives.c).toBe(c)
+    expect(res.directives.d).toBe(d)
   })
 
 })

@@ -32,17 +32,6 @@ exports.attr = function (node, attr) {
 }
 
 /**
- * Append child to target
- *
- * @param {Element} el
- * @param {Element} target
- */
-
-exports.append = function (el, target) {
-  target.appendChild(el)
-}
-
-/**
  * Insert el before target
  *
  * @param {Element} el
@@ -102,8 +91,9 @@ exports.prepend = function (el, target) {
 
 exports.replace = function (target, el) {
   var parent = target.parentNode
-  parent.insertBefore(el, target)
-  parent.removeChild(target)
+  if (parent) {
+    parent.replaceChild(el, target)
+  }
 }
 
 /**
@@ -145,4 +135,34 @@ exports.on = function (el, event, cb) {
 
 exports.off = function (el, event, cb) {
   el.removeEventListener(event, cb)
+}
+
+/**
+ * Compatibility add class for IE9
+ *
+ * @param {Element} el
+ * @param {Strong} cls
+ */
+
+exports.addClass = function (el, cls) {
+  var cur = ' ' + el.className + ' '
+  if (cur.indexOf(' ' + cls + ' ') < 0) {
+    el.className = (cur + cls).trim()
+  }
+}
+
+/**
+ * Compatibility remove class for IE9
+ *
+ * @param {Element} el
+ * @param {Strong} cls
+ */
+
+exports.removeClass = function (el, cls) {
+  var cur = ' ' + el.className + ' '
+  var tar = ' ' + cls + ' '
+  while (cur.indexOf(tar) >= 0) {
+    cur = cur.replace(tar, ' ')
+  }
+  el.className = cur.trim()
 }

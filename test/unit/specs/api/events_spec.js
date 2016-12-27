@@ -83,6 +83,21 @@ describe('Events API', function () {
     child2.$broadcast = spy
     vm.$broadcast('test')
     expect(spy.calls.count()).toBe(1)
+    // check $off bookkeeping
+    child.$off('test', spy)
+    expect(vm._eventsCount['test']).toBe(0)
+    function noop () {}
+    child.$on('test', noop)
+    child2.$on('test', noop)
+    expect(vm._eventsCount['test']).toBe(2)
+    child.$off('test')
+    expect(vm._eventsCount['test']).toBe(1)
+    child.$on('test', noop)
+    child2.$on('test', noop)
+    expect(vm._eventsCount['test']).toBe(3)
+    child.$off()
+    child2.$off()
+    expect(vm._eventsCount['test']).toBe(0)
   })
 
   it('$broadcast cancel', function () {

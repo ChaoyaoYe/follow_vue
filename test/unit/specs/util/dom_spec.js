@@ -58,12 +58,6 @@ if (_.inBrowser) {
       expect(parent.childNodes.length).toBe(0)
     })
 
-    it('append', function () {
-      _.append(target, parent)
-      expect(target.parentNode).toBe(parent)
-      expect(parent.lastChild).toBe(target)
-    })
-
     it('prepend', function () {
       _.prepend(target, parent)
       expect(target.parentNode).toBe(parent)
@@ -93,6 +87,8 @@ if (_.inBrowser) {
     })
 
     it('on/off', function () {
+      // IE requires element to be in document to fire events
+      document.body.appendChild(target)
       var spy = jasmine.createSpy()
       _.on(target, 'click', spy)
       var e = document.createEvent('HTMLEvents')
@@ -103,6 +99,20 @@ if (_.inBrowser) {
       _.off(target, 'click', spy)
       target.dispatchEvent(e)
       expect(spy.calls.count()).toBe(1)
+      document.body.removeChild(target)
+    })
+
+    it('addClass/removeClass', function () {
+      var el = document.createElement('div')
+      el.className = 'aa bb cc'
+      _.removeClass(el, 'bb')
+      expect(el.className).toBe('aa cc')
+      _.removeClass(el, 'aa')
+      expect(el.className).toBe('cc')
+      _.addClass(el, 'bb')
+      expect(el.className).toBe('cc bb')
+      _.addClass(el, 'bb')
+      expect(el.className).toBe('cc bb')
     })
   })
 }

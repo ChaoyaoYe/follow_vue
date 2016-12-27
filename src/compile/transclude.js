@@ -14,13 +14,10 @@ var templateParser = require('../parse/template')
  */
 
 module.exports = function transclude (el, options) {
-  var type = typeof el
-  if (type === 'string') {
-    var selector = el
-    el = document.querySelector(el)
-    if (!el) {
-      _.warn('Cannot find element: ' + selector)
-    }
+  // for template tags, what we want is its content as
+  // a documentFragment (for block instances)
+  if (el.tagName === 'TEMPLATE') {
+    el = templateParser.parse(el)
   }
   if (el instanceof DocumentFragment) {
     return transcludeBlock(el)
@@ -74,6 +71,7 @@ function transcludeTemplate (el, options) {
       }
     } else {
       el.appendChild(frag)
+      transcludeContent(el)
       return el
     }
   }
@@ -152,7 +150,9 @@ var concat = [].concat
 function getOutlets (el) {
   return _.isArray(el)
     ? concat.apply([], el.map(getOutlets))
-    : _.toArray(el.querySelectorAll('content'))
+    : el.nodeType === 1
+      ? _.toArray(el.querySelectorAll('content'))
+      : []
 }
 
 /**
