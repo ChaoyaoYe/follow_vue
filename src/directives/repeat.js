@@ -5,6 +5,7 @@ var expParser = require('../parse/expression')
 var templateParser = require('../parse/template')
 var compile = require('../compile/compile')
 var transclude = require('../compile/transclude')
+var mergeOptions = require('../util/merge-option')
 var uid = 0
 
 module.exports = {
@@ -16,29 +17,31 @@ module.exports = {
   bind: function () {
     // uid as a cache identifier
     this.id = '__v_repeat_' + (++uid)
-    // put in the default filter to guard Object values
-    // this filter needs to always be the first one. We
-    // can do this in bind because the watcher is not
-    // created yet.
+    // we need to insert the objToArray converter
+    // as the first read filter.
     if (!this.filters) {
-      this.filters = []
+      this.filters = {}
     }
-    this.filters.unshift({ name: '_objToArray' })
+    if (!this.filters.read) {
+      this.filters.read = [objToArray]
+    } else {
+      this.filters.read.unshift(objToArray)
+    }
+    // setup ref node
+    this.ref = document.createComment('v-repeat')
+    _.replace(this.el, this.ref)
+    // check if this is a block repeat
+    this.template = this.el.tagName === 'TEMPLATE'
+      ? templateParser.parse(this.el, true)
+      : this.el
     // check other directives that need to be handled
     // at v-repeat level
     this.checkIf()
     this.checkRef()
     this.checkTrackById()
     this.checkComponent()
-    // setup ref node
-    this.ref = document.createComment('v-repeat')
     // cache for primitive value instances
     this.cache = Object.create(null)
-    _.replace(this.el, this.ref)
-    // check if this is a block repeat
-    if (this.el.tagName === 'TEMPLATE') {
-      this.el = templateParser.parse(this.el)
-    }
   },
 
   /**
@@ -97,26 +100,27 @@ module.exports = {
     if (!id) {
       this.Ctor = _.Vue // default constructor
       this.inherit = true // inline repeats should inherit
-      this._linker = compile(this.el, _.Vue.options)
+      this._linker = compile(this.template, this.vm.$options)
     } else {
       var tokens = textParser.parse(id)
       if (!tokens) { // static component
         var Ctor = this.Ctor = this.vm.$options.components[id]
         _.assertAsset(Ctor, 'component', id)
         if (Ctor) {
-          this.el = transclude(this.el, Ctor.options)
-          this._linker = compile(this.el, Ctor.options)
+          // merge an empty object with owner vm as parent
+          // so child vms can access parent assets.
+          var merged = mergeOptions(
+            Ctor.options,
+            {},
+            { $parent: this.vm }
+          )
+          this.template = transclude(this.template, merged)
+          this._linker = compile(this.template, merged)
         }
-      } else if (tokens.length === 1) {
-        // to be resolved later
-        this.CtorExp = tokens[0].value
       } else {
-        _.warn(
-          'Invalid attribute binding: "' +
-           'component="' + id + '"' +
-          '\nDon\'t mix binding tags with plain text ' +
-          'in attribute bindings.'
-        )
+        // to be resolved later
+        var ctorExp = textParser.tokensToExp(tokens)
+        this.ctorGetter = expParser.parse(ctorExp).get
       }
     }
   },
@@ -129,12 +133,8 @@ module.exports = {
    */
 
   update: function (data) {
-    if (data && !_.isArray(data)) {
-      _.warn(
-        'Invalid value for v-repeat:' + data +
-        '\nExpects Object or Array.'
-      )
-      return
+    if (typeof data === 'number') {
+      data = range(data)
     }
     this.converted = data && data._converted
     this.vms = this.diff(data || [], this.vms)
@@ -189,7 +189,6 @@ module.exports = {
         }
         if (idKey) { // swap track by id data
           if (alias) {
-            console.log('reusing...')
             vm[alias] = raw
           } else {
             vm._setData(raw)
@@ -222,17 +221,20 @@ module.exports = {
     // right place. We're going in reverse here because
     // insertBefore relies on the next sibling to be
     // resolved.
-    var targetNext, currentNext, nextEl
+    var targetNext, currentNext
     i = vms.length
     while (i--) {
       vm = vms[i]
       // this is the vm that we should be in front of
       targetNext = vms[i + 1]
       if (!targetNext) {
-        // This is the last item, just insert before the
-        // ref node. However we only want animation for
-        // newly created instances.
-        vm.$before(ref, null, !vm._reused)
+        // This is the last item. If it's reused then
+        // everything else will eventually be in the right
+        // place, so no need to touch it. Otherwise, insert
+        // it.
+        if (!vm._reused) {
+          vm.$before(ref)
+        }
       } else {
         if (vm._reused) {
           // this is the vm we are actually in front of
@@ -240,8 +242,7 @@ module.exports = {
           // we only need to move if we are not in the right
           // place already.
           if (currentNext !== targetNext) {
-            nextEl = findNextInDOMVmEl(targetNext, vms, ref)
-            vm.$before(nextEl, null, false)
+            vm.$before(targetNext.$el, null, false)
           }
         } else {
           // new instance, insert to existing next
@@ -279,7 +280,7 @@ module.exports = {
     // resolve constructor
     var Ctor = this.Ctor || this.resolveCtor(data)
     var vm = this.vm.$addChild({
-      el: this.el.cloneNode(true),
+      el: this.template.cloneNode(true),
       _linker: this._linker,
       _meta: meta,
       data: data,
@@ -300,14 +301,13 @@ module.exports = {
    */
 
   resolveCtor: function (data) {
-    var getter = expParser.parse(this.CtorExp).get
     var context = Object.create(this.vm)
     for (var key in data) {
       // use _.define to avoid accidentally
       // overwriting scope properties
       _.define(context, key, data[key])
     }
-    var id = getter(context)
+    var id = this.ctorGetter.call(context, context)
     var Ctor = this.vm.$options.components[id]
     _.assertAsset(Ctor, 'component', id)
     return Ctor
@@ -439,9 +439,7 @@ module.exports = {
  */
 
 function findNextVm (vm, ref) {
-  var el = (vm._isBlock
-    ? vm._blockEnd
-    : vm.$el).nextSibling
+  var el = (vm._blockEnd || vm.$el).nextSibling
   while (!el.__vue__ && el !== ref) {
     el = el.nextSibling
   }
@@ -449,22 +447,46 @@ function findNextVm (vm, ref) {
 }
 
 /**
- * Helper to find the next vm that is already in the DOM
- * and return its $el. This is necessary because newly
- * inserted vms might not be in the DOM yet due to entering
- * transitions.
+ * Attempt to convert non-Array objects to array.
+ * This is the default filter installed to every v-repeat
+ * directive.
  *
- * @param {Vue} next
- * @param {Array} vms
- * @param {CommentNode} ref
- * @return {Element}
+ * @param {*} obj
+ * @return {Array}
+ * @private
  */
 
-function findNextInDOMVmEl (next, vms, ref) {
-  var el = next.$el
-  while (!el.parentNode) {
-    next = vms[next.$index + 1]
-    el = next ? next.$el : ref
+function objToArray (obj) {
+  if (!_.isPlainObject(obj)) {
+    return obj
   }
-  return el
+  var keys = Object.keys(obj)
+  var i = keys.length
+  var res = new Array(i)
+  var key
+  while (i--) {
+    key = keys[i]
+    res[i] = {
+      key: key,
+      value: obj[key]
+    }
+  }
+  res._converted = true
+  return res
+}
+
+/**
+ * Create a range array from given number.
+ *
+ * @param {Number} n
+ * @return {Array}
+ */
+
+function range (n) {
+  var i = -1
+  var ret = new Array(n)
+  while (++i < n) {
+    ret[i] = i
+  }
+  return ret
 }

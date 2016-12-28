@@ -168,30 +168,50 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
 
 ## Instance methods change
 
-- `vm.$watch` can now accept an expression:
+- #### `vm.$watch`
 
-  ``` js
-  vm.$watch('a + b', function (newVal, oldVal) {
-    // do something
-  })
-  ```
+  - **Expression watching**
 
-  By default the callback only fires when the value changes. If you want it to be called immediately with the initial value, use the third optional `immediate` argument:
+    `vm.$watch` can now accept an expression:
 
-  ``` js
-  vm.$watch('a', callback, true)
-  // callback is fired immediately with current value of `a`
-  ```
+    ``` js
+    vm.$watch('a + b', function (newVal, oldVal) {
+      // do something
+    })
+    ```
 
-- (Breaking) `$unwatch` has been removed. `$watch` now also returns an unregister function:
+  - **Deep watching**
 
-  ``` js
-  var unwatch = vm.$watch('a', cb)
-  // later, teardown the watcher
-  unwatch()
-  ```
+    (Breaking) A change from 0.11 is that `$watch` now by default only fires when the identity of the watched value changes. If you want the watcher to also fire the callback when a nested value changes, pass in the third optional `deep` argument:
 
-- `vm.$get` now accepts expressions:
+    ``` js
+    vm.$watch('someObject', callback, true)
+    vm.someObject.nestedValue = 123
+    // callback is fired
+    ```
+
+  - **Immediate invocation**
+
+    By default the callback only fires when the value changes. If you want it to be called immediately with the initial value, use the fourth optional `immediate` argument:
+
+    ``` js
+    vm.$watch('a', callback, false, true)
+    // callback is fired immediately with current value of `a`
+    ```
+
+  - **Unwatching**
+
+    (Breaking) `$unwatch` has been removed. `$watch` now also returns an unregister function:
+
+    ``` js
+    var unwatch = vm.$watch('a', cb)
+    // later, teardown the watcher
+    unwatch()
+    ```
+
+- #### `vm.$get`
+
+  `vm.$get` now accepts expressions:
 
   ``` js
   var value = vm.$get('a + b')
@@ -267,7 +287,27 @@ computed: {
 
     `v-model` now will check `lazy` attribute for lazy model update, and will check `number` attribute to know if it needs to convert the value into Numbers before writing back to the model.
 
-    When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array to use as its options. The Array can contain plain strings, or contain objects for `<optgroups>`:
+    When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array to use as its options. The Array can contain plain strings, or contain objects.
+
+    The object can be in the format of `{label:'', value:''}`. This allows you to have the option displayed differently from its underlying value:
+
+    ``` js
+    [
+      { label: 'A', value: 'a' },
+      { label: 'B', value: 'b' }
+    ]
+    ```
+
+    Will render:
+
+    ``` html
+    <select>
+      <option value="a">A</option>
+      <option value="b">B</option>
+    </select>
+    ```
+
+    Alternatively, the object can contain an `options` Array. In this case it will be rendered as an `<optgroup>`:
 
     ``` js
     [

@@ -28,6 +28,10 @@ module.exports = {
     }
     this.cpUnlock = function () {
       cpLocked = false
+      // in IE11 the "compositionend" event fires AFTER
+      // the "input" event, so the input handler is blocked
+      // at the end... have to call it here.
+      set()
     }
     _.on(el,'compositionstart', this.cpLock)
     _.on(el,'compositionend', this.cpUnlock)
@@ -57,10 +61,9 @@ module.exports = {
         _.nextTick(function () {
           var newVal = self._watcher.value
           self.update(newVal)
-          if (cursorPos == null) {
-            cursorPos = newVal.toString().length
+          if (cursorPos != null) {
+            el.setSelectionRange(cursorPos, cursorPos)
           }
-          el.setSelectionRange(cursorPos, cursorPos)
         })
       }
     } else {
@@ -94,7 +97,7 @@ module.exports = {
   },
 
   update: function (value) {
-    this.el.value = value
+    this.el.value = _.toString(value)
   },
 
   unbind: function () {

@@ -85,7 +85,7 @@ if (_.inBrowser) {
         vm.$mount(frag)
         expect(vm.$el).toBe(vm._blockStart)
         expect(vm._blockFragment).toBe(frag)
-        expect(vm.$el.nextSibling.textContent).toBe('frag')
+        expect(vm.$el.textContent).toBe('frag')
       })
 
       it('replace fragment', function () {
@@ -97,8 +97,8 @@ if (_.inBrowser) {
         })
         vm.$mount(el)
         expect(vm.$el).not.toBe(el)
+        expect(vm.$el.textContent).toBe('hi!')
         expect(vm.$el.nextSibling.textContent).toBe('hi!')
-        expect(vm.$el.nextSibling.nextSibling.textContent).toBe('hi!')
         expect(document.body.contains(el)).toBe(false)
         expect(document.body.lastChild).toBe(vm._blockEnd)
         vm.$remove()
@@ -143,7 +143,10 @@ if (_.inBrowser) {
       it('normal', function () {
         var vm = new Vue()
         expect(vm._isDestroyed).toBe(false)
+        var data = vm._data
+        expect(data.__ob__.vms.length).toBe(1)
         vm.$destroy()
+        expect(data.__ob__.vms.length).toBe(0)
         expect(vm._isDestroyed).toBe(true)
         expect(vm._watchers).toBeNull()
         expect(vm._userWatchers).toBeNull()

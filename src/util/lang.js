@@ -19,7 +19,7 @@ exports.isReserved = function (str) {
  */
 
 exports.toString = function (value) {
-  return value === null
+  return value == null
     ? ''
     : value.toString()
 }

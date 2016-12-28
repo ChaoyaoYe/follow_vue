@@ -14,11 +14,12 @@ function noop () {}
  *
  * @param {Element|DocumentFragment} el
  * @param {Object} options
+ * @param {Boolean} partial
  * @return {Function}
  */
 
-module.exports = function compile (el, options) {
-  var params = options.paramAttributes
+module.exports = function compile (el, options, partial) {
+  var params = !partial && options.paramAttributes
   var paramsLinkFn = params
     ? compileParamAttributes(el, params, options)
     : null
@@ -85,12 +86,23 @@ function compileElement (el, options) {
     return makeTeriminalLinkFn(el, 'component', tag, options)
   }
   // check other directives
+  var linkFn
   if (hasAttributes) {
     var directives = collectDirectives(el, options)
-    return directives.length
+    linkFn = directives.length
       ? makeDirectivesLinkFn(directives)
       : null
   }
+  // if the element is a textarea, we need to interpolate
+  // its content on initial render.
+  if (el.tagName === 'TEXTAREA') {
+    var realLinkFn = linkFn
+    linkFn = function (vm, el) {
+      el.value = vm.$interpolate(el.value)
+      if (realLinkFn) realLinkFn(vm, el)      
+    }
+  }
+  return linkFn
 }
 
 /**
