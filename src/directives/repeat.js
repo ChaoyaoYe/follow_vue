@@ -22,10 +22,12 @@ module.exports = {
     if (!this.filters) {
       this.filters = {}
     }
+    // add the object -> array convert filter
+    var objectConverter = _.bind(objToArray, this)
     if (!this.filters.read) {
-      this.filters.read = [objToArray]
+      this.filters.read = [objectConverter]
     } else {
-      this.filters.read.unshift(objToArray)
+      this.filters.read.unshift(objectConverter)
     }
     // setup ref node
     this.ref = document.createComment('v-repeat')
@@ -133,7 +135,6 @@ module.exports = {
     if (typeof data === 'number') {
       data = range(data)
     }
-    this.converted = data && data._converted
     this.vms = this.diff(data || [], this.vms)
     // update v-ref
     if (this.childId) {
@@ -277,9 +278,9 @@ module.exports = {
       meta.$value = raw
     }
     // resolve constructor
-    var Ctor = this.Ctor || this.resolveCtor(data)
+    var Ctor = this.Ctor || this.resolveCtor(data, meta)
     var vm = this.vm.$addChild({
-      el: this.template.cloneNode(true),
+      el: templateParser.clone(this.template),
       _linker: this._linker,
       _meta: meta,
       data: data,
@@ -296,15 +297,22 @@ module.exports = {
    * components depending on instance data.
    *
    * @param {Object} data
+   * @param {Object} meta
    * @return {Function}
    */
 
-  resolveCtor: function (data) {
+  resolveCtor: function (data, meta) {
+    // create a temporary context object and copy data
+    // and meta properties onto it.
+    // use _.define to avoid accidentally overwriting scope
+    // properties.
     var context = Object.create(this.vm)
-    for (var key in data) {
-      // use _.define to avoid accidentally
-      // overwriting scope properties
+    var key
+    for (key in data) {
       _.define(context, key, data[key])
+    }
+    for (key in meta) {
+      _.define(context, key, meta[key])
     }
     var id = this.ctorGetter.call(context, context)
     var Ctor = this.vm.$options.components[id]
@@ -450,6 +458,10 @@ function findNextVm (vm, ref) {
  * This is the default filter installed to every v-repeat
  * directive.
  *
+ * It will be called with **the directive** as `this`
+ * context so that we can mark the repeat array as converted
+ * from an object.
+ *
  * @param {*} obj
  * @return {Array}
  * @private
@@ -470,7 +482,8 @@ function objToArray (obj) {
       value: obj[key]
     }
   }
-  res._converted = true
+  // `this` points to the repeat directive instance
+  this.converted = true
   return res
 }
 

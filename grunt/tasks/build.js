@@ -1,3 +1,7 @@
+/**
+ * Build, update component.json, uglify, and report size.
+ */
+
 module.exports = function (grunt) {
   grunt.registerTask('build', function () {
 
@@ -19,11 +23,16 @@ module.exports = function (grunt) {
     grunt.file.write('component.json', JSON.stringify(component, null, 2))
 
     // then build
-    build(grunt, function (js) {
-      write('dist/vue.js', js)
+    build(grunt, function (err) {
+      if (err) return done(err)
+      var js = fs.readFileSync('dist/vue.js', 'utf-8')
+      report('dist/vue.js', js)
       // uglify
-      var min = uglifyjs.minify(js, {
+      var result = uglifyjs.minify(js, {
         fromString: true,
+        output: {
+          comments: /License/
+        },
         compress: {
           pure_funcs: [
             'require',
@@ -33,18 +42,22 @@ module.exports = function (grunt) {
             'enableDebug'
           ]
         }
-      }).code
-      min = grunt.config.get('banner') + min
-      write('dist/vue.min.js', min)
+      })
+      // var min = grunt.config.get('banner') + result.code
+      write('dist/vue.min.js', result.code)
       // report gzip size
-      zlib.gzip(min, function (err, buf) {
+      zlib.gzip(result.code, function (err, buf) {
         write('dist/vue.min.js.gz', buf)
-        done()
+        done(err)
       })
     })
 
     function write (path, file) {
       fs.writeFileSync(path, file)
+      report(path, file)
+    }
+
+    function report (path, file) {
       console.log(
         blue(path + ': ') +
         (file.length / 1024).toFixed(2) + 'kb'

@@ -30,13 +30,15 @@ vm.$mount('#app') // actually compile the DOM
 var vm = new Vue({ el: '#app', data: {a: 1} })
 ```
 
+If `$mount()` is called with no argument, an empty `<div>` will then be created.
+
 ## New Scope Inheritance Model
 
 > Breaking
 
 In the previous version, nested Vue instances do not have prototypal inheritance of their data scope. Although you can access parent data properties in templates, you need to explicitly travel up the scope chain with `this.$parent` in JavaScript code or use `this.$get()` to get a property on the scope chain. The expression parser also needs to do a lot of dirty work to determine the correct scope the variables belong to.
 
-In the new model, we provide a scope inehritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! Because all data properties in Vue are getter/setters, so setting a property with the same key as parent on a child will not cause the child scope to create a new property shadowing the parent one, but rather it will just invoke the parent's setter function. See the example [here](http://jsfiddle.net/Px2n6/2/).
+In the new model, we provide a scope inheritance system similar to Angular, in which you can directly access properties that exist on parent scopes. The major difference is that setting a primitive value property on a child scope WILL affect that on the parent scope! Because all data properties in Vue are getter/setters, so setting a property with the same key as parent on a child will not cause the child scope to create a new property shadowing the parent one, but rather it will just invoke the parent's setter function. See the example [here](http://jsfiddle.net/Px2n6/2/).
 
 The result of this model is a much cleaner expression evaluation implementation. All expressions can simply be evaluated against the vm.
 
@@ -439,7 +441,7 @@ Vue.config.debug = true
 
 - #### New config option: `proto`
 
-  Be default, Vue.js alters observed data objects' `__proto__` when available for faster method interception/augmentation. This is perfectly fine when your data objects are plain JSON-derived objects. However if you want to use Vue's observation on object created with custom prototypes (e.g. from constructors), you can set `Vue.config.proto = false` to prohibit this behavior.
+  Be default, Vue.js alters the `__proto__` of observed Arrays when available for faster method interception/augmentation. This would only cause issue in the rare case when you are observing a subclass of the native Array. In that case, you can set `Vue.config.proto = false` to prohibit this behavior.
 
 ## Transition API Change
 
@@ -577,5 +579,7 @@ Rendered result:
 ```
 
 ## Misc
+
+- `$destroy()` now by default leaves `$el` intact. If you want to remove it (and trigger transitions), call `$destroy(true)`.
 
 - When there are inline values on input elements bound with `v-model`, e.g. `<input value="hi" v-model="msg">`, the **inline value** will be used as the inital value. If the vm comes with default data, it **will be overwritten** by the inline value. Same for `selected` attribute on `<option>` elements.

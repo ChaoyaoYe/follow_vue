@@ -28,6 +28,19 @@ if (_.inBrowser) {
         expect(el.textContent).toBe('hi!')
       })
 
+      it('auto-create', function () {
+        var vm = new Vue({
+          template: '{{a}}',
+          data: {
+            a: 123
+          }
+        })
+        vm.$mount()
+        expect(vm.$el).toBeTruthy()
+        expect(vm.$el.tagName).toBe('DIV')
+        expect(vm.$el.textContent).toBe('123')
+      })
+
       it('selector', function () {
         el.id = 'mount-test'
         document.body.appendChild(el)
@@ -188,8 +201,11 @@ if (_.inBrowser) {
       it('parent', function () {
         var parent = new Vue()
         var child = parent.$addChild()
-        expect(parent._children.length).toBe(1)
+        var child2 = parent.$addChild()
+        expect(parent._children.length).toBe(2)
         child.$destroy()
+        expect(parent._children.length).toBe(1)
+        child2.$destroy()
         expect(parent._children.length).toBe(0)
       })
 

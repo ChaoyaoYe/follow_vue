@@ -2,17 +2,9 @@ var sauceConfig = require('./grunt/sauce')
 
 module.exports = function (grunt) {
 
-  var version = grunt.file.readJSON('package.json').version
-  var banner =
-    '/**\n' +
-    ' * Vue.js v' + version + '\n' +
-    ' * (c) ' + new Date().getFullYear() + ' Evan You\n' +
-    ' * Released under the MIT License.\n' +
-    ' */\n'
-
   grunt.initConfig({
 
-    banner: banner,
+    version: grunt.file.readJSON('package.json').version,
 
     jshint: {
       options: {
@@ -59,7 +51,7 @@ module.exports = function (grunt) {
       },
       browsers: {
         options: {
-          browsers: ['Chrome', 'Firefox'],
+          browsers: ['Chrome', 'Firefox', 'Safari'],
           reporters: ['progress']
         }
       },
@@ -114,7 +106,7 @@ module.exports = function (grunt) {
   grunt.registerTask('cover', ['karma:coverage'])
   grunt.registerTask('test', ['unit', 'cover', 'casper'])
   grunt.registerTask('sauce', ['karma:sauce1', 'karma:sauce2', 'karma:sauce3'])
-  grunt.registerTask('ci', ['jshint', 'test', 'coveralls', 'sauce'])
-  grunt.registerTask('default', ['jshint', 'test', 'build'])
+  grunt.registerTask('ci', ['default', 'coveralls', 'sauce'])
+  grunt.registerTask('default', ['jshint', 'build', 'test'])
 
 }

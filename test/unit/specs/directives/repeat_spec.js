@@ -110,6 +110,20 @@ if (_.inBrowser) {
       assertObjectPrimitiveMutations(vm, el, done)
     })
 
+    it('repeating object with filter', function () {
+      var vm = new Vue({
+        el: el,
+        data: {
+          items: {
+            a: { msg: 'aaa' },
+            b: { msg: 'bbb' }
+          }
+        },
+        template: '<div v-repeat="items | filterBy \'aaa\'">{{msg}}</div>'
+      })
+      expect(el.innerHTML).toBe('<div>aaa</div><!--v-repeat-->')
+    })
+
     it('v-component', function () {
       var vm = new Vue({
         el: el,
@@ -157,6 +171,26 @@ if (_.inBrowser) {
             { type: 'b' },
             { type: 'c' }
           ]
+        },
+        components: {
+          'view-a': {
+            template: 'AAA'
+          },
+          'view-b': {
+            template: 'BBB'
+          },
+          'view-c': {
+            template: 'CCC'
+          }
+        }
+      })
+      expect(el.innerHTML).toBe('<div>AAA</div><div>BBB</div><div>CCC</div><!--v-repeat-->')
+      // #458 meta properties
+      vm = new Vue({
+        el: el,
+        template: '<div v-repeat="list" v-component="view-{{$value}}"></div>',
+        data: {
+          list: ['a', 'b', 'c']
         },
         components: {
           'view-a': {
