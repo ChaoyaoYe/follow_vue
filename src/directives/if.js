@@ -1,17 +1,29 @@
 var _ = require('../util')
+var compile = require('../compile/compile')
 var templateParser = require('../parse/template')
+var transition = require('../transition')
 
 module.exports = {
 
   bind: function () {
     var el = this.el
     if (!el.__vue__) {
-      this.ref = document.createComment('v-if')
-      _.replace(el, this.ref)
-      this.inserted = false
+      this.start = document.createComment('v-if-start')
+      this.end = document.createComment('v-if-end')
+      _.replace(el, this.end)
+      _.before(this.start, this.end)
       if (el.tagName === 'TEMPLATE') {
-        this.el = templateParser.parse(el, true)
+        this.template = templateParser.parse(el, true)
+      } else {
+        this.template = document.createDocumentFragment()
+        this.template.appendChild(el)
       }
+      // compile the nested partial
+      this.linker = compile(
+        this.template,
+        this.vm.$options,
+        true
+      )
     } else {
       this.invalid = true
       _.warn(
@@ -24,29 +36,27 @@ module.exports = {
   update: function (value) {
     if (this.invalid) return
     if (value) {
-      if (!this.inserted) {
-        if (!this.childVM) {
-          this.childVM = this.vm.$addChild({
-            el: this.el,
-            data: this.vm._data,
-            inherit: true,
-            _anonymous: true
-          })
-        }
-        this.childVM.$before(this.ref)
-        this.inserted = true
-      }
+      this.insert()
     } else {
-      if (this.inserted) {
-        this.childVM.$remove()
-        this.inserted = false
-      }
+      this.teardown()
     }
   },
 
-  unbind: function () {
-    if (this.childVM) {
-      this.childVM.$destroy()
+  insert: function () {
+    var vm = this.vm
+    var frag = templateParser.clone(this.template)
+    var decompile = this.linker(vm, frag)
+    this.decompile = function () {
+      decompile()
+      transition.blockRemove(this.start, this.end, vm)
+    }
+    transition.blockAppend(frag, this.end, vm)
+  },
+
+  teardown: function () {
+    if (this.decompile) {
+      this.decompile()
+      this.decompile = null
     }
   }
 

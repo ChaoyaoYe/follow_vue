@@ -306,9 +306,19 @@ if (_.inBrowser) {
         data: {
           test: 'b'
         },
-        template: '<input v-model="test" value="a">'
+        template: '<input v-model="test | test" value="a">',
+        filters: {
+          test: {
+            read: function (v) {
+              return v.slice(0, -1)
+            },
+            write: function (v) {
+              return v + 'c'
+            }
+          }
+        }
       })
-      expect(vm.test).toBe('a')
+      expect(vm.test).toBe('ac')
       expect(el.firstChild.value).toBe('a')
     })
 
@@ -360,11 +370,12 @@ if (_.inBrowser) {
         data: {
           test: 1
         },
-        template: '<input v-model="test" number>'
+        template: '<input v-model="test" value="2" number>'
       })
-      el.firstChild.value = 2
-      trigger(el.firstChild, 'input')
       expect(vm.test).toBe(2)
+      el.firstChild.value = 3
+      trigger(el.firstChild, 'input')
+      expect(vm.test).toBe(3)
     })
 
     it('IE9 cut and delete', function (done) {
@@ -458,6 +469,19 @@ if (_.inBrowser) {
         el: el,
         data: { a: 123 },
         template: '<select v-model="test" options="a"></select>'
+      })
+      expect(_.warn).toHaveBeenCalled()
+    })
+
+    it('warn read-only filters', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<input v-model="abc | test">',
+        filters: {
+          test: function (v) {
+            return v
+          }
+        }
       })
       expect(_.warn).toHaveBeenCalled()
     })

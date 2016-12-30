@@ -7,14 +7,20 @@ var compile = require('../../../../src/compile/compile')
 if (_.inBrowser) {
   describe('Compile', function () {
 
-    var vm, el, data
+    var vm, el, data, directiveTeardown
     beforeEach(function () {
       // We mock vms here so we can assert what the generated
       // linker functions do.
       el = document.createElement('div')
       data = {}
+      directiveTeardown = jasmine.createSpy()
       vm = {
-        _bindDir: jasmine.createSpy(),
+        _directives: [],
+        _bindDir: function () {
+          this._directives.push({
+            _teardown: directiveTeardown
+          })
+        },
         $set: jasmine.createSpy(),
         $eval: function (value) {
           return data[value]
@@ -23,6 +29,7 @@ if (_.inBrowser) {
           return data[value]
         }
       }
+      spyOn(vm, '_bindDir').and.callThrough()
       spyOn(vm, '$eval').and.callThrough()
       spyOn(vm, '$interpolate').and.callThrough()
       spyOn(_, 'warn')
@@ -43,10 +50,6 @@ if (_.inBrowser) {
       })
       var linker = compile(el, options)
       expect(typeof linker).toBe('function')
-      // should remove attributes
-      expect(el.attributes.length).toBe(0)
-      expect(el.firstChild.attributes.length).toBe(0)
-      expect(el.lastChild.attributes.length).toBe(0)
       linker(vm, el)
       expect(vm._bindDir.calls.count()).toBe(4)
       expect(vm._bindDir).toHaveBeenCalledWith('a', el, descriptorB, defA)
@@ -135,7 +138,7 @@ if (_.inBrowser) {
       data['{{*b}}'] = 'B'
       el.innerHTML = '<div a="{{a}}" b="{{*b}}"></div>'
       var def = Vue.options.directives.attr
-      var descriptor = dirParser.parse('a:(a)')[0]
+      var descriptor = dirParser.parse('a:a')[0]
       var linker = compile(el, Vue.options)
       linker(vm, el)
       expect(vm._bindDir.calls.count()).toBe(1)
@@ -145,12 +148,13 @@ if (_.inBrowser) {
 
     it('param attributes', function () {
       var options = merge(Vue.options, {
-        paramAttributes: ['a', 'b', 'c']
+        paramAttributes: ['a', 'data-some-attr', 'some-other-attr', 'invalid']
       })
       var def = Vue.options.directives['with']
       el.setAttribute('a', '1')
-      el.setAttribute('b', '{{a}}')
-      el.setAttribute('c', 'a {{b}} c') // invalid
+      el.setAttribute('data-some-attr', '{{a}}')
+      el.setAttribute('some-other-attr', '2')
+      el.setAttribute('invalid', 'a {{b}} c') // invalid
       var linker = compile(el, options)
       linker(vm, el)
       // should skip literal & invliad
@@ -158,12 +162,13 @@ if (_.inBrowser) {
       var args = vm._bindDir.calls.argsFor(0)
       expect(args[0]).toBe('with')
       expect(args[1]).toBe(el)
-      // skipping descriptor because it's ducked inline
+      expect(args[2].arg).toBe('someAttr')
       expect(args[3]).toBe(def)
       // invalid should've warn
       expect(_.warn).toHaveBeenCalled()
       // literal should've called vm.$set
       expect(vm.$set).toHaveBeenCalledWith('a', '1')
+      expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', '2')
     })
 
     it('DocumentFragment', function () {
@@ -179,6 +184,16 @@ if (_.inBrowser) {
       linker(vm, frag)
       expect(el.innerHTML).toBe('A')
       expect(el2.innerHTML).toBe('B')
+    })
+
+    it('partial compilation', function () {
+      el.innerHTML = '<div v-attr="test:abc">{{bcd}}<p v-show="ok"></p></div>'
+      var linker = compile(el, Vue.options, true)
+      var decompile = linker(vm, el)
+      expect(vm._directives.length).toBe(3)
+      decompile()
+      expect(directiveTeardown.calls.count()).toBe(3)
+      expect(vm._directives.length).toBe(0)
     })
 
   })

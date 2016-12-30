@@ -2,7 +2,7 @@ var _ = require('../util')
 
 module.exports = {
 
-  isFn: true,
+  acceptStatement: true,
   priority: 700,
 
   bind: function () {
@@ -29,12 +29,11 @@ module.exports = {
     }
     this.reset()
     var vm = this.vm
-    var root = vm.$root
     this.handler = function (e) {
       e.targetVM = vm
-      root.$event = e
+      vm.$event = e
       var res = handler(e)
-      root.$event = null
+      vm.$event = null
       return res
     }
     if (this.iframeBind) {

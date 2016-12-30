@@ -348,4 +348,30 @@ describe('Watcher', function () {
     })
   })
 
+  it('synchronous updates', function () {
+    config.async = false
+    var watcher = new Watcher(vm, 'a', spy)
+    vm.a = 2
+    vm.a = 3
+    expect(spy.calls.count()).toBe(2)
+    expect(spy).toHaveBeenCalledWith(2, 1)
+    expect(spy).toHaveBeenCalledWith(3, 2)
+    config.async = true
+  })
+
+  it('handle a cb that triggers removeCb', function () {
+    var watcher = new Watcher(vm, 'a', spy)
+    watcher.addCb(function () {
+      watcher.removeCb(spy)
+    })
+    watcher.addCb(function () {})
+    config.async = false
+    expect(function () {
+      vm.a = 2
+    }).not.toThrow()
+    config.async = true
+    expect(spy).toHaveBeenCalled()
+    expect(watcher.cbs.length).toBe(2)
+  })
+
 })

@@ -1,4 +1,5 @@
 var _ = require('./util')
+var config = require('./config')
 var Watcher = require('./watcher')
 var textParser = require('./parse/text')
 var expParser = require('./parse/expression')
@@ -50,6 +51,9 @@ var p = Directive.prototype
  */
 
 p._bind = function (def) {
+  if (this.name !== 'cloak' && this.el.removeAttribute) {
+    this.el.removeAttribute(config.prefix + this.name)
+  }
   if (typeof def === 'function') {
     this.update = def
   } else {
@@ -63,7 +67,7 @@ p._bind = function (def) {
   if (
     this.update && this._watcherExp &&
     (!this.isLiteral || this._isDynamicLiteral) &&
-    !this._checkExpFn()
+    !this._checkStatement()
   ) {
     // use raw expression as identifier because filters
     // make them different watchers
@@ -87,7 +91,11 @@ p._bind = function (def) {
       watcher.addCb(update)
     }
     this._watcher = watcher
-    this.update(watcher.value)
+    if (this._initValue != null) {
+      watcher.set(this._initValue)
+    } else {
+      this.update(watcher.value)
+    }
   }
   this._bound = true
 }
@@ -122,10 +130,10 @@ p._checkDynamicLiteral = function () {
  * @return {Boolean}
  */
 
-p._checkExpFn = function () {
+p._checkStatement = function () {
   var expression = this.expression
   if (
-    expression && this.isFn &&
+    expression && this.acceptStatement &&
     !expParser.pathTestRE.test(expression)
   ) {
     var fn = expParser.parse(expression).get
@@ -158,7 +166,7 @@ p._teardown = function () {
     if (watcher && watcher.active) {
       watcher.removeCb(this._update)
       if (!watcher.active) {
-        this.vm._watchers[this.expression] = null
+        this.vm._watchers[this.raw] = null
       }
     }
     this._bound = false

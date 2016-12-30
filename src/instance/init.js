@@ -50,14 +50,6 @@ exports._init = function (options) {
   this._childCtors = null  // @type {Object} - hash to cache
                            // child constructors
 
-  // anonymous instances are created by v-if
-  // if an instance is anonymous, its owner will be the
-  // first non-anonymous parent; otherwise its owner will
-  // be itself.
-  this._owner = options._anonymous
-    ? this.$parent._owner
-    : this
-
   // merge options.
   options = this.$options = mergeOptions(
     this.constructor.options,
@@ -68,11 +60,11 @@ exports._init = function (options) {
   // set data after merge.
   this._data = options.data || {}
 
-  // setup event system and option events.
-  this._initEvents()
-
   // initialize data observation and scope inheritance.
   this._initScope()
+
+  // setup event system and option events.
+  this._initEvents()
 
   // call created hook
   this._callHook('created')

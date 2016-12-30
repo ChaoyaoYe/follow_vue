@@ -73,6 +73,15 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
   })
   ```
 
+- #### `paramAttributes` change
+
+  `paramAttributes` now behaves a little differently when the attribute name contains dashes:
+
+  1. If the attribute is a data attribute, the `data-` prefix will be auto stripped;
+  2. If the attribute still contains dashes, it will be camelized. The reason is because it's inconvenient to access top level properties containing dashes in templates: the expression `my-param` will be parsed as a minus expression unless you use the awkward `this['my-param']` syntax.
+
+  This means a param attribute `data-hello` will be set on the vm as `vm.hello`; And `my-param` will be set as `vm.myParam`.
+
 - #### new option: `events`.
 
   When events are used extensively for cross-vm communication, the ready hook can get kinda messy. The new `events` option is similar to its Backbone equivalent, where you can declaratiely register a bunch of event listeners. You can also use it to register hook listeners.
@@ -102,6 +111,10 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
   // -> goodbye!
   ```
 
+- #### new option: `watch`.
+
+  Similar to the new `events` option, the `watch` option accepts an object of expression/callback pairs. The instance will automatically call `$watch` for each entry in the object. You can also use a method name string instead of a callback.
+
 - #### new option: `inherit`.
 
   Default: `false`.
@@ -127,7 +140,7 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
   // -> 2
   ```
 
-- #### new options: `name`.
+- #### new option: `name`.
 
   This option, when used with `Vue.extend`, gives your returned constructor a more descriptive name rather than the generic `VueComponent`. This makes debugging easier when you log instances in the console. For example:
 
@@ -266,6 +279,10 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
     vm.$log('item') // logs vm.item
     ```
 
+  - `vm.$compile`
+
+    Partially compile a piece of DOM (Element or DocumentFragment). Returns a "decompile" function that tearsdown the directives created during the process. Note the decompile function does not remove the DOM. This method is exposed primarily for writing advanced custom directives.
+
 ## Computed Properties API Change
 
 > Breaking
@@ -283,6 +300,10 @@ computed: {
 
 ## Directive API change
 
+- #### Directive Priority
+
+  Now each directive can optionally have a `priority` value which determines the order it gets compiled among all directives on the same element. Priorities for some built-in directives will be available in the API reference after 0.11 is released.
+
 - #### Dynamic literals
 
   Literal directives can now also be dynamic via bindings like this:
@@ -295,7 +316,7 @@ computed: {
 
   When authoring literal directives, you can now provide an `update()` function if you wish to handle it dynamically. If no `update()` is provided the directive will be treated as a static literal and only evaluated once.
 
-  Note that `v-component` is the only directive that supports this.
+  Note that `v-component` and `v-partial` are the only directives that support this.
 
 - #### Directive params
 
@@ -395,7 +416,17 @@ computed: {
 
   This option indicates the directive is two-way and may write back to the model. Allows the use of `this.set(value)` inside directive functions.
 
-- #### Removed directive option: `isEmpty`
+- #### New directive option: `acceptStatement`
+
+  This option indicates the directive accepts inline statements like `v-on` does:
+
+  ``` html
+  <a v-on="click: a++"></a>
+  ```
+
+  The statement will be wrapped up as a function and passed as the argument to the directive's `update` function.
+
+- #### Removed directive option: `isEmpty`, `isFn`
 
 ## Interpolation change
 
@@ -441,7 +472,11 @@ Vue.config.debug = true
 
 - #### New config option: `proto`
 
-  Be default, Vue.js alters the `__proto__` of observed Arrays when available for faster method interception/augmentation. This would only cause issue in the rare case when you are observing a subclass of the native Array. In that case, you can set `Vue.config.proto = false` to prohibit this behavior.
+  By default, Vue.js alters the `__proto__` of observed Arrays when available for faster method interception/augmentation. This would only cause issue in the rare case when you are observing a subclass of the native Array. In that case, you can set `Vue.config.proto = false` to prohibit this behavior.
+
+- #### New config option: `async`
+
+  By default Vue.js uses batched async updates for watchers and DOM updates. This strategy ensures minimal calls to directive and watcher functions, but in some situations also makes things harder to reason about. It is now possible to force synchronous updates by setting `Vue.config.async = false`.
 
 ## Transition API Change
 
@@ -576,6 +611,18 @@ Rendered result:
 <p>subtitle-2</p>
 <p>content-2</p>
 <!--v-block-end-->
+```
+
+Additionally, you can also use `v-partial` with `<template>` for a block partial:
+
+``` html
+<template v-partial="abc"></template>
+```
+
+Which is the equivalance of `{{>abc}}`. However, the `<template>` syntax allows you to bind a **dynamic block partial**:
+
+``` html
+<template v-partial="{{partialId}}"></template>
 ```
 
 ## Misc
