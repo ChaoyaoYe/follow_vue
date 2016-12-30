@@ -125,6 +125,22 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
   // -> 2
   ```
 
+- #### new options: `name`.
+
+  This option, when used with `Vue.extend`, gives your returned constructor a more descriptive name rather than the generic `VueComponent`. This makes debugging easier when you log instances in the console. For example:
+
+  ``` js
+  var SubClass = Vue.extend({
+    name: 'MyComponent'
+  })
+  var instance = new SubClass()
+  console.log(instance) // -> MyComponent { $el: ... }
+  ```
+
+  When you use `Vue.component`, the component ID is automatically camelized and used as the constructor name, so `"my-component"` will have a constructor name of `MyComponent`.
+
+  This option is ignored as an instance option.
+
 - #### removed options:
 
   > Breaking
@@ -289,12 +305,12 @@ computed: {
 
     When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array to use as its options. The Array can contain plain strings, or contain objects.
 
-    The object can be in the format of `{label:'', value:''}`. This allows you to have the option displayed differently from its underlying value:
+    The object can be in the format of `{text:'', value:''}`. This allows you to have the option text displayed differently from its underlying value:
 
     ``` js
     [
-      { label: 'A', value: 'a' },
-      { label: 'B', value: 'b' }
+      { text: 'A', value: 'a' },
+      { text: 'B', value: 'b' }
     ]
     ```
 
@@ -307,7 +323,7 @@ computed: {
     </select>
     ```
 
-    Alternatively, the object can contain an `options` Array. In this case it will be rendered as an `<optgroup>`:
+    Alternatively, the object can be in the format of `{ label:'', options:[...] }`. In this case it will be rendered as an `<optgroup>`:
 
     ``` js
     [
@@ -321,12 +337,12 @@ computed: {
     ``` html
     <select>
       <optgroup label="A">
-        <option>a</option>
-        <option>b</option>
+        <option value="a">a</option>
+        <option value="b">b</option>
       </optgroup>
       <optgroup label="B">
-        <option>c</option>
-        <option>d</option>
+        <option value="c">c</option>
+        <option value="d">d</option>
       </optgroup>
     </select>
     ```

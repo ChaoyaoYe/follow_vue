@@ -107,18 +107,21 @@ strats.filters =
 strats.partials =
 strats.transitions =
 strats.components = function (parentVal, childVal, vm, key) {
-  var ret = Object.create(parentVal || null)
-  if (childVal) extend(ret, childVal)
-  if (vm && vm.$parent) {
-    var scopeVal = vm.$parent.$options[key]
-    var keys = Object.keys(scopeVal)
+  var ret = Object.create(
+    vm && vm.$parent
+      ? vm.$parent.$options[key]
+      : _.Vue.options[key]
+  )
+  if (parentVal) {
+    var keys = Object.keys(parentVal)
     var i = keys.length
     var field
     while (i--) {
       field = keys[i]
-      ret[field] = scopeVal[field]
+      ret[field] = parentVal[field]
     }
   }
+  if (childVal) extend(ret, childVal)
   return ret
 }
 
@@ -180,6 +183,7 @@ function guardComponents (components) {
     for (var key in components) {
       def = components[key]
       if (_.isPlainObject(def)) {
+        def.name = key
         components[key] = _.Vue.extend(def)
       }
     }
