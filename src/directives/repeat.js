@@ -1,4 +1,5 @@
 var _ = require('../util')
+var config = require('../config')
 var isObject = _.isObject
 var isPlainObject = _.isPlainObject
 var textParser = require('../parsers/text')
@@ -47,8 +48,8 @@ module.exports = {
     this.idKey =
       this._checkParam('track-by') ||
       this._checkParam('trackby') // 0.11.0 compat
-    // cache for primitive value instances
     this.cache = Object.create(null)
+    this.checkUpdateStrategy()
   },
 
   /**
@@ -96,7 +97,12 @@ module.exports = {
       this.template = transclude(this.template)
       this._linkFn = compile(this.template, options)
     } else {
-      this._asComponent = true
+      this.asComponent = true
+      // check inline-template
+      if (this._checkParam('inline-template') !== null) {
+        // extract inline template as a DocumentFragment
+        this.inlineTempalte = _.extractContent(this.el, true)
+      }
       var tokens = textParser.parse(id)
       if (!tokens) { // static component
         var Ctor = this.Ctor = options.components[id]
@@ -112,6 +118,7 @@ module.exports = {
           var merged = mergeOptions(Ctor.options, {}, {
             $parent: this.vm
           })
+          merged.template = this.inlineTempalte || merged.template
           this.template = transclude(this.template, merged)
           this._linkFn = compile(this.template, merged, false, true)
         }
@@ -124,17 +131,47 @@ module.exports = {
   },
 
   /**
+   * Check what strategy to use for updates.
+   * 
+   * If the repeat is simple enough we can use in-place
+   * updates which simply overwrites existing instances'
+   * data. This strategy reuses DOM nodes and instances
+   * as much as possible.
+   * 
+   * There are two situations where we have to use the
+   * more complex but more accurate diff algorithm:
+   * 1. We are using components with or inside v-repeat.
+   *    The components could have private state that needs
+   *    to be preserved across updates.
+   * 2. We have transitions on the list, which requires
+   *    precise DOM re-positioning.
+   */
+
+  checkUpdateStrategy: function () {
+    this.needDiff =
+      this.asComponent ||
+      this.el.hasAttribute(config.prefix + 'transition') ||
+      this.template.querySelector('[' + config.prefix + 'component]')
+  },
+
+  /**
    * Update.
    * This is called whenever the Array mutates.
    *
-   * @param {Array} data
+   * @param {Array|Number|String} data
    */
 
   update: function (data) {
-    if (typeof data === 'number') {
+    data = data || []
+    var type = typeof data
+    if (type === 'number') {
       data = range(data)
+    } else if (type === 'string') {
+      data = _.toArray(data)
     }
-    this.vms = this.diff(data || [], this.vms)
+    this.vms = this.needDiff
+      ? this.diff(data, this.vms)
+      : this.inplaceUpdate(data, this.vms)
     // update v-ref
     if (this.refID) {
       this.vm.$[this.refID] = this.vms
@@ -144,6 +181,43 @@ module.exports = {
         return vm.$el
       })
     }
+  },
+
+  /**
+   * Inplace update that maximally reuses existing vm
+   * instances and DOM nodes by simply swapping data into
+   * existing vms.
+   *
+   * @param {Array} data
+   * @param {Array} oldVms
+   * @return {Array}
+   */
+
+  inplaceUpdate: function (data, oldVms) {
+    oldVms = oldVms || []
+    var vms
+    var dir = this
+    var alias = dir.arg
+    var converted = dir.converted
+    if (data.length < oldVms.length) {
+      oldVms.slice(data.length).forEach(function (vm) {
+        vm.$destroy(true)
+      })
+      vms = oldVms.slice(0, data.length)
+      overwrite(data, vms, alias, converted)
+    } else if (data.length > oldVms.length) {
+      var newVms = data.slice(oldVms.length).map(function (data, i) {
+        var vm = dir.build(data, i + oldVms.length)
+        vm.$before(dir.ref)
+        return vm
+      })
+      overwrite(data.slice(0, oldVms.length), oldVms, alias, converted)
+      vms = oldVms.concat(newVms)
+    } else {
+      overwrite(data, oldVms, alias, converted)
+      vms = oldVms
+    }
+    return vms
   },
 
   /**
@@ -176,13 +250,13 @@ module.exports = {
     // instance.
     for (i = 0, l = data.length; i < l; i++) {
       obj = data[i]
-      raw = converted ? obj.value : obj
+      raw = converted ? obj.$value : obj
       vm = !init && this.getVm(raw)
       if (vm) { // reusable instance
         vm._reused = true
         vm.$index = i // update $index
         if (converted) {
-          vm.$key = obj.key // update $key
+          vm.$key = obj.$key // update $key
         }
         if (idKey) { // swap track by id data
           if (alias) {
@@ -192,8 +266,9 @@ module.exports = {
           }
         }
       } else { // new instance
-        vm = this.build(obj, i)
+        vm = this.build(obj, i, true)
         vm._new = true
+        vm._reused = false
       }
       vms[i] = vm
       // insert if this is first run
@@ -258,17 +333,18 @@ module.exports = {
    *
    * @param {Object} data
    * @param {Number} index
+   * @param {Boolean} needCache
    */
 
-  build: function (data, index) {
+  build: function (data, index, needCache) {
     var original = data
     var meta = { $index: index }
     if (this.converted) {
-      meta.$key = original.key
+      meta.$key = original.$key
     }
-    var raw = this.converted ? data.value : data
+    var raw = this.converted ? data.$value : data
     var alias = this.arg
-    var hasAlias = !isPlainObject(raw) || alias
+    var hasAlias = !isObject(raw) || !isPlainObject(data) || alias
     // wrap the raw data with alias
     data = hasAlias ? {} : raw
     if (alias) {
@@ -280,14 +356,30 @@ module.exports = {
     var Ctor = this.Ctor || this.resolveCtor(data, meta)
     var vm = this.vm.$addChild({
       el: templateParser.clone(this.template),
-      _asComponent: this._asComponent,
+      _asComponent: this.asComponent,
       _linkFn: this._linkFn,
       _meta: meta,
       data: data,
-      inherit: this.inherit
+      inherit: this.inherit,
+      template: this.inlineTempalte
     }, Ctor)
+    // flag this instance as a repeat instance
+    // so that we can skip it in vm._digest
+    vm._repeat = true
     // cache instance
-    this.cacheVm(raw, vm)
+    if (needCache) {
+      this.cacheVm(raw, vm)
+    }
+    // sync back changes for $value, particularly for
+    // two-way bindings of primitive values
+    var self = this
+    vm.$watch('$value', function (val) {
+      if (self.converted) {
+        self.rawValue[vm.$key] = val
+      } else {
+        self.rawValue.$set(vm.$index, val)
+      }
+    })
     return vm
   },
 
@@ -333,7 +425,9 @@ module.exports = {
       var vm
       while (i--) {
         vm = this.vms[i]
-        this.uncacheVm(vm)
+        if (this.needDiff) {
+          this.uncacheVm(vm)
+        }
         vm.$destroy()
       }
     }
@@ -360,7 +454,7 @@ module.exports = {
       if (!cache[id]) {
         cache[id] = vm
       } else {
-        _.warn('Duplicate ID in v-repeat: ' + id)
+        _.warn('Duplicate track-by key in v-repeat: ' + id)
       }
     } else if (isObject(data)) {
       id = this.id
@@ -369,7 +463,8 @@ module.exports = {
           data[id] = vm
         } else {
           _.warn(
-            'Duplicate objects are not supported in v-repeat.'
+            'Duplicate objects are not supported in v-repeat ' +
+            'when using components or transitions.'
           )
         }
       } else {
@@ -468,6 +563,8 @@ function findNextVm (vm, ref) {
  */
 
 function objToArray (obj) {
+  // regardless of type, store the un-filtered raw value.
+  this.rawValue = obj
   if (!isPlainObject(obj)) {
     return obj
   }
@@ -478,8 +575,8 @@ function objToArray (obj) {
   while (i--) {
     key = keys[i]
     res[i] = {
-      key: key,
-      value: obj[key]
+      $key: key,
+      $value: obj[key]
     }
   }
   // `this` points to the repeat directive instance
@@ -501,4 +598,33 @@ function range (n) {
     ret[i] = i
   }
   return ret
+}
+
+/**
+ * Helper function to overwrite new data Array on to
+ * existing vms. Used in `inplaceUpdate`.
+ *
+ * @param {Array} arr
+ * @param {Array} vms
+ * @param {String|undefined} alias
+ * @param {Boolean} converted
+ */
+
+function overwrite (arr, vms, alias, converted) {
+  var vm, data, raw
+  for (var i = 0, l = arr.length; i < l; i++) {
+    vm = vms[i]
+    data = raw = arr[i]
+    if (converted) {
+      vm.$key = data.$key
+      raw = data.$value
+    }
+    if (alias) {
+      vm[alias] = raw
+    } else if (!isObject(raw)) {
+      vm.$value = raw
+    } else {
+      vm._setData(raw)
+    }
+  }
 }

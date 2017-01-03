@@ -63,6 +63,12 @@ var testCases = [
     paths: ['a']
   },
   {
+    //multiline expressions
+    exp: "{\n a: '35',\n b: c}",
+    scope:{c:32},
+    expected: { a : '35', b : 32 }
+  },
+  {
     // dollar signs and underscore
     exp: "_a + ' ' + $b",
     scope: {
@@ -182,13 +188,29 @@ var testCases = [
     },
     expected: Math.sin(1),
     paths: ['a']
+  },
+  {
+    // boolean literal
+    exp: 'true',
+    scope: {
+      true: false
+    },
+    expected: true,
+    paths: []
+  },
+  {
+    // Date global
+    exp: 'Date.now() > new Date("2000-01-01")',
+    scope: {},
+    expected: true,
+    paths: []
   }
 ]
 
 describe('Expression Parser', function () {
-  
-  it('parse getter', function () {
-    testCases.forEach(function assertExp (testCase) {
+
+  testCases.forEach(function (testCase) {
+    it('parse getter: ' + testCase.exp, function () {
       var res = expParser.parse(testCase.exp, true)
       expect(res.get(testCase.scope)).toEqual(testCase.expected)
     })
