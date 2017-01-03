@@ -1,19 +1,7 @@
 var _ = require('../util')
 var Cache = require('../cache')
-var templateCache = new Cache(100)
-
-/**
- * Test for the presence of the Safari template cloning bug
- * https://bugs.webkit.org/show_bug.cgi?id=137755
- */
-
-var hasBrokenTemplate = _.inBrowser
-  ? (function () {
-      var a = document.createElement('div')
-      a.innerHTML = '<template>1</template>'
-      return !a.cloneNode(true).firstChild.innerHTML
-    })()
-  : false
+var templateCache = new Cache(1000)
+var idSelectorCache = new Cache(1000)
 
 var map = {
   _default : [0, '', ''],
@@ -141,9 +129,30 @@ function nodeToFragment (node) {
     : stringToFragment(node.innerHTML)
 }
 
+// Test for the presence of the Safari template cloning bug
+// https://bugs.webkit.org/show_bug.cgi?id=137755
+var hasBrokenTemplate = _.inBrowser
+  ? (function () {
+      var a = document.createElement('div')
+      a.innerHTML = '<template>1</template>'
+      return !a.cloneNode(true).firstChild.innerHTML
+    })()
+  : false
+
+// Test for IE10/11 textarea placeholder clone bug
+var hasTextareaCloneBug = _.inBrowser
+  ? (function () {
+      var t = document.createElement('textarea')
+      t.placeholder = 't'
+      return t.cloneNode(true).value === 't'
+    })()
+  : false
+
 /**
- * Deal with Safari cloning nested <template> bug by
- * manually cloning all template instances.
+ * 1. Deal with Safari cloning nested <template> bug by
+ *    manually cloning all template instances.
+ * 2. Deal with IE10/11 textarea placeholder bug by setting
+ *    the correct value after cloning.
  *
  * @param {Element|DocumentFragment} node
  * @return {Element|DocumentFragment}
@@ -151,17 +160,33 @@ function nodeToFragment (node) {
 
 exports.clone = function (node) {
   var res = node.cloneNode(true)
+  var i, original, cloned
   /* istanbul ignore if */
   if (hasBrokenTemplate) {
-    var templates = node.querySelectorAll('template')
-    if (templates.length) {
-      var cloned = res.querySelectorAll('template')
-      var i = cloned.length
+    original = node.querySelectorAll('template')
+    if (original.length) {
+      cloned = res.querySelectorAll('template')
+      i = cloned.length
       while (i--) {
         cloned[i].parentNode.replaceChild(
-          templates[i].cloneNode(true),
+          original[i].cloneNode(true),
           cloned[i]
         )
+      }
+    }
+  }
+  /* istanbul ignore if */
+  if (hasTextareaCloneBug) {
+    if (node.tagName === 'TEXTAREA') {
+      res.value = node.value
+    } else {
+      original = node.querySelectorAll('textarea')
+      if (original.length) {
+        cloned = res.querySelectorAll('textarea')
+        i = cloned.length
+        while (i--) {
+          cloned[i].value = original[i].value
+        }
       }
     }
   }
@@ -180,10 +205,11 @@ exports.clone = function (node) {
  *    - id selector: '#some-template-id'
  *    - template string: '<div><span>{{msg}}</span></div>'
  * @param {Boolean} clone
+ * @param {Boolean} noSelector
  * @return {DocumentFragment|undefined}
  */
 
-exports.parse = function (template, clone) {
+exports.parse = function (template, clone, noSelector) {
   var node, frag
 
   // if the template is already a document fragment,
@@ -196,15 +222,15 @@ exports.parse = function (template, clone) {
 
   if (typeof template === 'string') {
     // id selector
-    if (template.charAt(0) === '#') {
+    if (!noSelector && template.charAt(0) === '#') {
       // id selector can be cached too
-      frag = templateCache.get(template)
+      frag = idSelectorCache.get(template)
       if (!frag) {
         node = document.getElementById(template.slice(1))
         if (node) {
           frag = nodeToFragment(node)
           // save selector to cache
-          templateCache.put(template, frag)
+          idSelectorCache.put(template, frag)
         }
       }
     } else {

@@ -225,6 +225,36 @@ if (_.inBrowser) {
       expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
     })
 
+    it('component + parent directive + transclusion', function (done) {
+      var vm = new Vue({
+        el: el,
+        template: '<div v-repeat="list" v-component="test" v-class="cls">{{msg}}</div>',
+        data: {
+          cls: 'parent',
+          msg: 'hi',
+          list: [{a:1},{a:2},{a:3}]
+        },
+        components: {
+          test: {
+            replace: true,
+            template: '<div class="child">{{a}} <content></content></div>'
+          }
+        }
+      })
+      var markup = vm.list.map(function (item) {
+        return '<div class="child parent">' + item.a + ' hi</div>'
+      }).join('')
+      expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+      vm.msg = 'ho'
+      markup = vm.list.map(function (item) {
+        return '<div class="child parent">' + item.a + ' ho</div>'
+      }).join('')
+      _.nextTick(function () {
+        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+        done()
+      })
+    })
+
     it('array filters', function (done) {
       var vm = new Vue({
         el: el,
@@ -287,10 +317,10 @@ if (_.inBrowser) {
       }
     })
 
-    it('trackby id', function (done) {
+    it('track by id', function (done) {
 
-      assertTrackBy('<div v-repeat="list" trackby="id">{{msg}}</div>', function () {
-        assertTrackBy('<div v-repeat="item:list" trackby="id">{{item.msg}}</div>', done)
+      assertTrackBy('<div v-repeat="list" track-by="id">{{msg}}</div>', function () {
+        assertTrackBy('<div v-repeat="item:list" track-by="id">{{item.msg}}</div>', done)
       })
       
       function assertTrackBy (template, next) {

@@ -1,5 +1,5 @@
 var _ = require('../util')
-var compile = require('../compile/compile')
+var compile = require('../compiler/compile')
 
 /**
  * Set instance target element and kick off the compilation
@@ -51,85 +51,12 @@ function ready () {
 }
 
 /**
- * Teardown an instance, unobserves the data, unbind all the
- * directives, turn off all the event listeners, etc.
- *
- * @param {Boolean} remove - whether to remove the DOM node.
- * @public
+ * Teardown the instance, simply delegate to the internal
+ * _destroy.
  */
 
-exports.$destroy = function (remove) {
-  if (this._isBeingDestroyed) {
-    return
-  }
-  this._callHook('beforeDestroy')
-  this._isBeingDestroyed = true
-  var i
-  // remove self from parent. only necessary
-  // if parent is not being destroyed as well.
-  var parent = this.$parent
-  if (parent && !parent._isBeingDestroyed) {
-    i = parent._children.indexOf(this)
-    parent._children.splice(i, 1)
-  }
-  // destroy all children.
-  if (this._children) {
-    i = this._children.length
-    while (i--) {
-      this._children[i].$destroy()
-    }
-  }
-  // teardown all directives. this also tearsdown all
-  // directive-owned watchers.
-  i = this._directives.length
-  while (i--) {
-    this._directives[i]._teardown()
-  }
-  // teardown all user watchers.
-  for (i in this._userWatchers) {
-    this._userWatchers[i].teardown()
-  }
-  // remove reference to self on $el
-  if (this.$el) {
-    this.$el.__vue__ = null
-  }
-  // remove DOM element
-  var self = this
-  if (remove && this.$el) {
-    this.$remove(function () {
-      cleanup(self)
-    })
-  } else {
-    cleanup(self)
-  }
-}
-
-/**
- * Clean up to ensure garbage collection.
- * This is called after the leave transition if there
- * is any.
- *
- * @param {Vue} vm
- */
-
-function cleanup (vm) {
-  // remove reference from data ob
-  vm._data.__ob__.removeVm(vm)
-  vm._data =
-  vm._watchers =
-  vm._userWatchers =
-  vm._watcherList =
-  vm.$el =
-  vm.$parent =
-  vm.$root =
-  vm._children =
-  vm._bindings =
-  vm._directives = null
-  // call the last hook...
-  vm._isDestroyed = true
-  vm._callHook('destroyed')
-  // turn off all instance listeners.
-  vm.$off()
+exports.$destroy = function (remove, deferCleanup) {
+  this._destroy(remove, deferCleanup)
 }
 
 /**

@@ -1,8 +1,8 @@
 var _ = require('./util')
 var config = require('./config')
 var Watcher = require('./watcher')
-var textParser = require('./parse/text')
-var expParser = require('./parse/expression')
+var textParser = require('./parsers/text')
+var expParser = require('./parsers/expression')
 
 /**
  * A directive links a DOM element with a piece of data,
@@ -18,11 +18,10 @@ var expParser = require('./parse/expression')
  *                 - {String} [arg]
  *                 - {Array<Object>} [filters]
  * @param {Object} def - directive definition object
- * @param {Function} [linker] - pre-compiled linker function
  * @constructor
  */
 
-function Directive (name, el, vm, descriptor, def, linker) {
+function Directive (name, el, vm, descriptor, def) {
   // public
   this.name = name
   this.el = el
@@ -33,7 +32,6 @@ function Directive (name, el, vm, descriptor, def, linker) {
   this.arg = descriptor.arg
   this.filters = _.resolveFilters(vm, descriptor.filters)
   // private
-  this._linker = linker
   this._locked = false
   this._bound = false
   // init
@@ -69,9 +67,6 @@ p._bind = function (def) {
     (!this.isLiteral || this._isDynamicLiteral) &&
     !this._checkStatement()
   ) {
-    // use raw expression as identifier because filters
-    // make them different watchers
-    var watcher = this.vm._watchers[this.raw]
     // wrapped updater for context
     var dir = this
     var update = this._update = function (val, oldVal) {
@@ -79,13 +74,20 @@ p._bind = function (def) {
         dir.update(val, oldVal)
       }
     }
-    if (!watcher) {
+    // use raw expression as identifier because filters
+    // make them different watchers
+    var watcher = this.vm._watchers[this.raw]
+    // v-repeat always creates a new watcher because it has
+    // a special filter that's bound to its directive
+    // instance.
+    if (!watcher || this.name === 'repeat') {
       watcher = this.vm._watchers[this.raw] = new Watcher(
         this.vm,
         this._watcherExp,
         update, // callback
         this.filters,
-        this.twoWay // need setter
+        this.twoWay, // need setter,
+        this.deep
       )
     } else {
       watcher.addCb(update)
@@ -151,6 +153,21 @@ p._checkStatement = function () {
     this.update(handler)
     return true
   }
+}
+
+/**
+ * Check for an attribute directive param, e.g. lazy
+ *
+ * @param {String} name
+ * @return {String}
+ */
+
+p._checkParam = function (name) {
+  var param = this.el.getAttribute(name)
+  if (param !== null) {
+    this.el.removeAttribute(name)
+  }
+  return param
 }
 
 /**

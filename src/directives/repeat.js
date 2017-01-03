@@ -1,10 +1,10 @@
 var _ = require('../util')
 var isObject = _.isObject
-var textParser = require('../parse/text')
-var expParser = require('../parse/expression')
-var templateParser = require('../parse/template')
-var compile = require('../compile/compile')
-var transclude = require('../compile/transclude')
+var textParser = require('../parsers/text')
+var expParser = require('../parsers/expression')
+var templateParser = require('../parsers/template')
+var compile = require('../compiler/compile')
+var transclude = require('../compiler/transclude')
 var mergeOptions = require('../util/merge-option')
 var uid = 0
 
@@ -18,7 +18,8 @@ module.exports = {
     // uid as a cache identifier
     this.id = '__v_repeat_' + (++uid)
     // we need to insert the objToArray converter
-    // as the first read filter.
+    // as the first read filter, because it has to be invoked
+    // before any user filters. (can't do it in `update`)
     if (!this.filters) {
       this.filters = {}
     }
@@ -40,8 +41,11 @@ module.exports = {
     // at v-repeat level
     this.checkIf()
     this.checkRef()
-    this.checkTrackById()
     this.checkComponent()
+    // check for trackby param
+    this.idKey =
+      this._checkParam('track-by') ||
+      this._checkParam('trackby') // 0.11.0 compat
     // cache for primitive value instances
     this.cache = Object.create(null)
   },
@@ -75,19 +79,6 @@ module.exports = {
   },
 
   /**
-   * Check for a track-by ID, which allows us to identify
-   * a piece of data and its associated instance by its
-   * unique id.
-   */
-
-  checkTrackById: function () {
-    this.idKey = this.el.getAttribute('trackby')
-    if (this.idKey !== null) {
-      this.el.removeAttribute('trackby')
-    }
-  },
-
-  /**
    * Check the component constructor to use for repeated
    * instances. If static we resolve it now, otherwise it
    * needs to be resolved at build time with actual data.
@@ -102,22 +93,26 @@ module.exports = {
       // important: transclude with no options, just
       // to ensure block start and block end
       this.template = transclude(this.template)
-      this._linker = compile(this.template, options)
+      this._linkFn = compile(this.template, options)
     } else {
+      this._asComponent = true
       var tokens = textParser.parse(id)
       if (!tokens) { // static component
         var Ctor = this.Ctor = options.components[id]
         _.assertAsset(Ctor, 'component', id)
-        if (Ctor) {
+        // If there's no parent scope directives and no
+        // content to be transcluded, we can optimize the
+        // rendering by pre-transcluding + compiling here
+        // and provide a link function to every instance.
+        if (!this.el.hasChildNodes() &&
+            !this.el.hasAttributes()) {
           // merge an empty object with owner vm as parent
           // so child vms can access parent assets.
-          var merged = mergeOptions(
-            Ctor.options,
-            {},
-            { $parent: this.vm }
-          )
+          var merged = mergeOptions(Ctor.options, {}, {
+            $parent: this.vm
+          })
           this.template = transclude(this.template, merged)
-          this._linker = compile(this.template, merged)
+          this._linkFn = compile(this.template, merged)
         }
       } else {
         // to be resolved later
@@ -284,7 +279,8 @@ module.exports = {
     var Ctor = this.Ctor || this.resolveCtor(data, meta)
     var vm = this.vm.$addChild({
       el: templateParser.clone(this.template),
-      _linker: this._linker,
+      _asComponent: this._asComponent,
+      _linkFn: this._linkFn,
       _meta: meta,
       data: data,
       inherit: this.inherit

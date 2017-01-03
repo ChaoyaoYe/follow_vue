@@ -1,26 +1,16 @@
 /**
- * A doubly linked list-based Least Recently Used (LRU) cache.
- * Will keep most recently used items while discarding least
- * recently used items when its limit is reached.
+ * A doubly linked list-based Least Recently Used (LRU)
+ * cache. Will keep most recently used items while
+ * discarding least recently used items when its limit is
+ * reached. This is a bare-bone version of
+ * Rasmus Andersson's js-lru:
  *
- * Licensed under MIT.
- * Copyright (c) 2010 Rasmus Andersson <http://hunch.se/>
- *
- * Illustration of the design:
- *
- *       entry             entry             entry             entry
- *       ______            ______            ______            ______
- *      | head |.newer => |      |.newer => |      |.newer => | tail |
- *      |  A   |          |  B   |          |  C   |          |  D   |
- *      |______| <= older.|______| <= older.|______| <= older.|______|
- *
- *  removed  <--  <--  <--  <--  <--  <--  <--  <--  <--  <--  <--  added
+ *   https://github.com/rsms/js-lru
  *
  * @param {Number} limit
  * @constructor
  */
-// attribute size->size of cache, limit->limit of cache, head and tail object
-// of cache, _keymap-> key map of cache xc.2016-2-19.
+
 function Cache (limit) {
   this.size = 0
   this.limit = limit
@@ -40,22 +30,21 @@ var p = Cache.prototype
  * @param {*} value
  * @return {Entry|undefined}
  */
-//put value by the key to the cache
+
 p.put = function (key, value) {
-  //create the entry to be put
   var entry = {
     key:key,
     value:value
   }
-  this._keymap[key] = entry // add key to the keymap of cache
-  if (this.tail) {// if the tail entry isn't empty, put new entry to it
+  this._keymap[key] = entry
+  if (this.tail) {
     this.tail.newer = entry
     entry.older = this.tail
-  } else {// if the tail entry is empty, let new entry be the head
+  } else {
     this.head = entry
   }
-  this.tail = entry // reset the tail entry of cache
-  if (this.size === this.limit) {// judge the size to determine whether to get rid of the old entry.
+  this.tail = entry
+  if (this.size === this.limit) {
     return this.shift()
   } else {
     this.size++
@@ -63,8 +52,9 @@ p.put = function (key, value) {
 }
 
 /**
- * Purge the least recently used (oldest) entry from the cache.
- * Returns the removed entry or undefined if the cache was empty.
+ * Purge the least recently used (oldest) entry from the
+ * cache. Returns the removed entry or undefined if the
+ * cache was empty.
  */
 
 p.shift = function () {

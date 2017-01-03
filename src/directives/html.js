@@ -1,5 +1,5 @@
 var _ = require('../util')
-var templateParser = require('../parse/template')
+var templateParser = require('../parsers/template')
 
 module.exports = {
 
@@ -28,7 +28,8 @@ module.exports = {
       _.remove(this.nodes[i])
     }
     // convert new value to a fragment
-    var frag = templateParser.parse(value, true)
+    // do not attempt to retrieve from id selector
+    var frag = templateParser.parse(value, true, true)
     // save a reference to these nodes so we can remove later
     this.nodes = _.toArray(frag.childNodes)
     _.before(frag, this.el)
