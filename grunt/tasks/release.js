@@ -64,9 +64,13 @@ module.exports = function (grunt) {
         console.log(blue('Releasing: ' + next))
         grunt.config.set('version', next)
         grunt.task.run([
-          'default',
-          'version:' + next
-          // 'git:' + next
+          'jshint',
+          'cover',
+          'build',
+          'casper',
+          'sauce',
+          'version:' + next,
+          'git:' + next
         ])
       }
       done()

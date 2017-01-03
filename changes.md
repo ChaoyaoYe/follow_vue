@@ -1,4 +1,4 @@
-> Live doc. Subject to change anytime before 0.11 release.
+# 0.10 -> 0.11 Migration Guide
 
 **Table of Contents**
 
@@ -197,6 +197,8 @@ By default, all child components **DO NOT** inherit the parent scope. Only anony
 
   - #### renamed hook: `afterDestroy` -> `destroyed`
 
+    Additionally, if there is a leaving transition, `beforeDestroy` is called before the transition starts, and `destroyed` will be called **after** the transition has finished (right after `detached`).
+
 ## Instance methods change
 
 - #### `vm.$watch`
@@ -324,6 +326,8 @@ computed: {
 
   - `v-model`
 
+    **BREAKING** `v-model` no longer works on arbitrary elements with `contenteditable`. It is now recommended to wrap a library that specifically deals with `contenteditable` inside a custom directive.
+
     `v-model` now will check `lazy` attribute for lazy model update, and will check `number` attribute to know if it needs to convert the value into Numbers before writing back to the model.
 
     When used on a `<select>` element, `v-model` will check for an `options` attribute, which should be an keypath/expression that points to an Array to use as its options. The Array can contain plain strings, or contain objects.
@@ -434,11 +438,11 @@ computed: {
 
 - #### One time interpolations
 
+  One time interpolations do not need to set up watchers and can improve initial rendering performance. If you know something's not going to change, make sure to use this new feature. Example:
+
   ``` html
   <span>{{* hello }}</span>
   ```
-
-  One time interpolations do not need to set up watchers and can improve initial rendering performance. If you know something's not going to change, make sure to use this new feature. Example:
 
 ## Config API change
 
@@ -496,7 +500,7 @@ With `v-transition="my-transition"`, Vue will:
 
 - #### JavaScript transitions API change
 
-  Now more similar to Angular:
+  Now more similar to Angular, and all hooks are called with `this` set to the vm owning the transitioned element:
 
   ``` js
   Vue.transition('fade', {

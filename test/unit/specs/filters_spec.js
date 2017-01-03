@@ -3,11 +3,22 @@ var filters = require('../../../src/filters')
 
 describe('Filters', function () {
 
-  it('json', function () {
-    var filter = filters.json
+  it('json read', function () {
+    var filter = filters.json.read
     var obj = {a:{b:2}}
     expect(filter(obj)).toBe(JSON.stringify(obj, null, 2))
     expect(filter(obj, 4)).toBe(JSON.stringify(obj, null, 4))
+    // plain string
+    expect(filter('1234')).toBe('1234')
+  })
+
+  it('json write', function () {
+    var filter = filters.json.write
+    var obj = '{"a":{"b":2}}'
+    expect(JSON.stringify(filter(obj))).toBe(obj)
+    // error condition
+    var invalidJSON = '{"a":}'
+    expect(filter(invalidJSON)).toBe(invalidJSON)
   })
   
   it('capitalize', function () {
@@ -58,6 +69,10 @@ describe('Filters', function () {
     expect(filter(false)).toBe('')
     expect(filter(null)).toBe('')
     expect(filter(undefined)).toBe('')
+    // negative numbers
+    expect(filter(-50)).toBe('-$50.00')
+    expect(filter(-150.43)).toBe('-$150.43')
+    expect(filter(-1500.4343434)).toBe('-$1,500.43')
   })
 
   it('key', function () {

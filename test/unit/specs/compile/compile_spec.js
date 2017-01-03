@@ -16,8 +16,9 @@ if (_.inBrowser) {
       directiveTeardown = jasmine.createSpy()
       vm = {
         _directives: [],
-        _bindDir: function () {
+        _bindDir: function (name) {
           this._directives.push({
+            name: name,
             _teardown: directiveTeardown
           })
         },
@@ -194,6 +195,22 @@ if (_.inBrowser) {
       decompile()
       expect(directiveTeardown.calls.count()).toBe(3)
       expect(vm._directives.length).toBe(0)
+    })
+
+    it('skip script tags', function () {
+      el.innerHTML = '<script type="x/template">{{test}}</script>'
+      var linker = compile(el, Vue.options)
+      linker(vm, el)
+      expect(vm._bindDir.calls.count()).toBe(0)
+    })
+
+    it('component parent scope compilation should skip v-ref, v-with & v-component', function () {
+      el.innerHTML = '<div v-component v-ref="test" v-with="test"></div>'
+      el = el.firstChild
+      var linker = compile(el, Vue.options, true, true)
+      linker(vm, el)
+      expect(vm._directives.length).toBe(0)
+      expect(el.attributes.length).toBe(3)
     })
 
   })
