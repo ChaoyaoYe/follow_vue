@@ -149,7 +149,7 @@ if (_.inBrowser) {
 
     it('param attributes', function () {
       var options = merge(Vue.options, {
-        paramAttributes: ['a', 'data-some-attr', 'some-other-attr', 'invalid']
+        paramAttributes: ['a', 'data-some-attr', 'some-other-attr', 'invalid', 'camelCase']
       })
       var def = Vue.options.directives['with']
       el.setAttribute('a', '1')
@@ -165,8 +165,8 @@ if (_.inBrowser) {
       expect(args[1]).toBe(el)
       expect(args[2].arg).toBe('someAttr')
       expect(args[3]).toBe(def)
-      // invalid should've warn
-      expect(_.warn).toHaveBeenCalled()
+      // invalid and camelCase should've warn
+      expect(_.warn.calls.count()).toBe(2)
       // literal should've called vm.$set
       expect(vm.$set).toHaveBeenCalledWith('a', '1')
       expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', '2')
@@ -204,13 +204,13 @@ if (_.inBrowser) {
       expect(vm._bindDir.calls.count()).toBe(0)
     })
 
-    it('component parent scope compilation should skip v-ref, v-with & v-component', function () {
-      el.innerHTML = '<div v-component v-ref="test" v-with="test"></div>'
+    it('component parent scope compilation should skip v-with & v-component', function () {
+      el.innerHTML = '<div v-component v-with="test"></div>'
       el = el.firstChild
       var linker = compile(el, Vue.options, true, true)
       linker(vm, el)
       expect(vm._directives.length).toBe(0)
-      expect(el.attributes.length).toBe(3)
+      expect(el.attributes.length).toBe(2)
     })
 
   })

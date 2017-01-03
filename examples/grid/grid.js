@@ -2,8 +2,10 @@
 Vue.component('demo-grid', {
   template: '#grid-template',
   replace: true,
+  paramAttributes: ['data', 'columns', 'filter-key'],
   data: function () {
     return {
+      data: null,
       columns: null,
       sortKey: '',
       filterKey: '',
@@ -29,7 +31,7 @@ Vue.component('demo-grid', {
 var demo = new Vue({
   el: '#demo',
   data: {
-    search: '',
+    searchQuery: '',
     gridColumns: ['name', 'power'],
     gridData: [
       { name: 'Chuck Norris', power: Infinity },

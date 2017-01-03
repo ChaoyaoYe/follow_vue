@@ -3,16 +3,7 @@ var _ = require('../../../../src/util')
 
 var testCases = [
   {
-    // simple path that doesn't exist
-    exp: 'a.b.c',
-    scope: {
-      a: {}
-    },
-    expected: undefined,
-    paths: ['a']
-  },
-  {
-    // simple path that exists
+    // simple path
     exp: 'a.b.d',
     scope: {
       a:{b:{d:123}}
@@ -175,6 +166,22 @@ var testCases = [
     },
     expected: 8,
     paths: ['$a', 'b', 'c', 'e']
+  },
+  {
+    // Math global, simple path
+    exp: 'Math.PI',
+    scope: {},
+    expected: Math.PI,
+    paths: []
+  },
+  {
+    // Math global, exp
+    exp: 'Math.sin(a)',
+    scope: {
+      a: 1
+    },
+    expected: Math.sin(1),
+    paths: ['a']
   }
 ]
 

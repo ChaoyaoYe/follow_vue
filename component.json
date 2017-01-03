@@ -1,6 +1,6 @@
 {
   "name": "vue",
-  "version": "0.11.2",
+  "version": "0.11.4",
   "main": "src/vue.js",
   "author": "Evan You <yyx990803@gmail.com>",
   "description": "Simple, Fast & Composable MVVM for building interative interfaces",
@@ -28,6 +28,7 @@
     "src/directives/cloak.js",
     "src/directives/component.js",
     "src/directives/el.js",
+    "src/directives/events.js",
     "src/directives/html.js",
     "src/directives/if.js",
     "src/directives/index.js",

@@ -18,17 +18,53 @@ var inBrowser = exports.inBrowser =
   toString.call(window) !== '[object Object]'
 
 /**
- * Defer a task to the start of the next event loop
+ * Defer a task to execute it asynchronously. Ideally this
+ * should be executed as a microtask, so we leverage
+ * MutationObserver if it's available.
+ * 
+ * If the user has included a setImmediate polyfill, we can
+ * also use that. In Node we actually prefer setImmediate to
+ * process.nextTick so we don't block the I/O.
+ * 
+ * Finally, fallback to setTimeout(0) if nothing else works.
  *
  * @param {Function} cb
  * @param {Object} ctx
  */
 
-var defer = inBrowser
-  ? (window.requestAnimationFrame ||
-    window.webkitRequestAnimationFrame ||
-    setTimeout)
-  : setTimeout
+var defer
+/* istanbul ignore if */
+if (typeof MutationObserver !== 'undefined') {
+  defer = deferFromMutationObserver(MutationObserver)
+} else
+/* istanbul ignore if */
+if (typeof WebkitMutationObserver !== 'undefined') {
+  defer = deferFromMutationObserver(WebkitMutationObserver)
+} else
+/* istanbul ignore if */
+if (typeof setImmediate !== 'undefined') {
+  defer = setImmediate
+} else {
+  defer = setTimeout
+}
+
+/* istanbul ignore next */
+function deferFromMutationObserver (Observer) {
+  var queue = []
+  var node = document.createTextNode('0')
+  var i = 0
+  new Observer(function () {
+    var l = queue.length
+    for (var i = 0; i < l; i++) {
+      queue[i]()
+    }
+    queue = queue.slice(l)
+  }).observe(node, { characterData: true })
+  return function mutationObserverDefer (cb) {
+    queue.push(cb)
+    node.nodeValue = (i = ++i % 2)
+  }
+}
 
 exports.nextTick = function (cb, ctx) {
   if (ctx) {

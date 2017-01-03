@@ -1,5 +1,6 @@
 var _ = require('../util')
 var isObject = _.isObject
+var isPlainObject = _.isPlainObject
 var textParser = require('../parsers/text')
 var expParser = require('../parsers/expression')
 var templateParser = require('../parsers/template')
@@ -68,9 +69,9 @@ module.exports = {
    */
 
   checkRef: function () {
-    var childId = _.attr(this.el, 'ref')
-    this.childId = childId
-      ? this.vm.$interpolate(childId)
+    var refID = _.attr(this.el, 'ref')
+    this.refID = refID
+      ? this.vm.$interpolate(refID)
       : null
     var elId = _.attr(this.el, 'el')
     this.elId = elId
@@ -112,7 +113,7 @@ module.exports = {
             $parent: this.vm
           })
           this.template = transclude(this.template, merged)
-          this._linkFn = compile(this.template, merged)
+          this._linkFn = compile(this.template, merged, false, true)
         }
       } else {
         // to be resolved later
@@ -135,8 +136,8 @@ module.exports = {
     }
     this.vms = this.diff(data || [], this.vms)
     // update v-ref
-    if (this.childId) {
-      this.vm.$[this.childId] = this.vms
+    if (this.refID) {
+      this.vm.$[this.refID] = this.vms
     }
     if (this.elId) {
       this.vm.$$[this.elId] = this.vms.map(function (vm) {
@@ -267,7 +268,7 @@ module.exports = {
     }
     var raw = this.converted ? data.value : data
     var alias = this.arg
-    var hasAlias = !isObject(raw) || alias
+    var hasAlias = !isPlainObject(raw) || alias
     // wrap the raw data with alias
     data = hasAlias ? {} : raw
     if (alias) {
@@ -324,8 +325,8 @@ module.exports = {
    */
 
   unbind: function () {
-    if (this.childId) {
-      delete this.vm.$[this.childId]
+    if (this.refID) {
+      this.vm.$[this.refID] = null
     }
     if (this.vms) {
       var i = this.vms.length
@@ -467,7 +468,7 @@ function findNextVm (vm, ref) {
  */
 
 function objToArray (obj) {
-  if (!_.isPlainObject(obj)) {
+  if (!isPlainObject(obj)) {
     return obj
   }
   var keys = Object.keys(obj)

@@ -62,18 +62,19 @@ p._bind = function (def) {
   if (this.bind) {
     this.bind()
   }
-  if (
-    this.update && this._watcherExp &&
-    (!this.isLiteral || this._isDynamicLiteral) &&
-    !this._checkStatement()
-  ) {
+  if (this._watcherExp &&
+      (this.update || this.twoWay) &&
+      (!this.isLiteral || this._isDynamicLiteral) &&
+      !this._checkStatement()) {
     // wrapped updater for context
     var dir = this
-    var update = this._update = function (val, oldVal) {
-      if (!dir._locked) {
-        dir.update(val, oldVal)
-      }
-    }
+    var update = this._update = this.update
+      ? function (val, oldVal) {
+          if (!dir._locked) {
+            dir.update(val, oldVal)
+          }
+        }
+      : function () {} // noop if no update is provided
     // use raw expression as identifier because filters
     // make them different watchers
     var watcher = this.vm._watchers[this.raw]
@@ -85,9 +86,11 @@ p._bind = function (def) {
         this.vm,
         this._watcherExp,
         update, // callback
-        this.filters,
-        this.twoWay, // need setter,
-        this.deep
+        {
+          filters: this.filters,
+          twoWay: this.twoWay,
+          deep: this.deep
+        }
       )
     } else {
       watcher.addCb(update)
@@ -95,7 +98,7 @@ p._bind = function (def) {
     this._watcher = watcher
     if (this._initValue != null) {
       watcher.set(this._initValue)
-    } else {
+    } else if (this.update) {
       this.update(watcher.value)
     }
   }

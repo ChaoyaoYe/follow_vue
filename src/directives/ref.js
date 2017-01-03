@@ -5,20 +5,19 @@ module.exports = {
   isLiteral: true,
 
   bind: function () {
-    if (this.el !== this.vm.$el) {
+    var vm = this.el.__vue__
+    if (!vm) {
       _.warn(
-        'v-ref should only be used on instance root nodes.'
+        'v-ref should only be used on a component root element.'
       )
       return
     }
-    this.owner = this.vm.$parent
-    this.owner.$[this.expression] = this.vm
-  },
-
-  unbind: function () {
-    if (this.owner.$[this.expression] === this.vm) {
-      delete this.owner.$[this.expression]
-    }
+    // If we get here, it means this is a `v-ref` on a
+    // child, because parent scope `v-ref` is stripped in
+    // `v-component` already. So we just record our own ref
+    // here - it will overwrite parent ref in `v-component`,
+    // if any.
+    vm._refID = this.expression
   }
   
 }

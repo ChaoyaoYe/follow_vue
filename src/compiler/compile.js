@@ -19,7 +19,8 @@ var templateParser = require('../parsers/template')
  * @param {Element|DocumentFragment} el
  * @param {Object} options
  * @param {Boolean} partial
- * @param {Boolean} asParent
+ * @param {Boolean} asParent - compiling a component
+ *                             container as its parent.
  * @return {Function}
  */
 
@@ -332,6 +333,15 @@ function compileParamAttributes (el, attrs, options) {
   var name, value, param
   while (i--) {
     name = attrs[i]
+    if (/[A-Z]/.test(name)) {
+      _.warn(
+        'You seem to be using camelCase for a paramAttribute, ' +
+        'but HTML doesn\'t differentiate between upper and ' +
+        'lower case. You should use hyphen-delimited ' +
+        'attribute names. For more info see ' +
+        'http://vuejs.org/api/options.html#paramAttributes'
+      )
+    }
     value = el.getAttribute(name)
     if (value !== null) {
       param = {
@@ -471,7 +481,6 @@ function collectDirectives (el, options, asParent) {
       dirName = attrName.slice(config.prefix.length)
       if (asParent &&
           (dirName === 'with' ||
-           dirName === 'ref' ||
            dirName === 'component')) {
         continue
       }
@@ -509,6 +518,10 @@ function collectDirectives (el, options, asParent) {
  */
 
 function collectAttrDirective (el, name, value, options) {
+  if (options._skipAttrs &&
+      options._skipAttrs.indexOf(name) > -1) {
+    return
+  }
   var tokens = textParser.parse(value)
   if (tokens) {
     var def = options.directives.attr

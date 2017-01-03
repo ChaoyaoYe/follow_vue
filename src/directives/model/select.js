@@ -69,7 +69,8 @@ function initOptions (expression) {
   this.optionWatcher = new Watcher(
     this.vm,
     expression,
-    optionUpdateWatcher
+    optionUpdateWatcher,
+    { deep: true }
   )
   // update with initial value
   optionUpdateWatcher(this.optionWatcher.value)

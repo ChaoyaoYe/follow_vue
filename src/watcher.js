@@ -2,9 +2,7 @@ var _ = require('./util')
 var config = require('./config')
 var Observer = require('./observer')
 var expParser = require('./parsers/expression')
-var Batcher = require('./batcher')
-
-var batcher = new Batcher()
+var batcher = require('./batcher')
 var uid = 0
 
 /**
@@ -15,29 +13,35 @@ var uid = 0
  * @param {Vue} vm
  * @param {String} expression
  * @param {Function} cb
- * @param {Array} [filters]
- * @param {Boolean} [needSet]
- * @param {Boolean} [deep]
+ * @param {Object} options
+ *                 - {Array} filters
+ *                 - {Boolean} twoWay
+ *                 - {Boolean} deep
+ *                 - {Boolean} user
  * @constructor
  */
 
-function Watcher (vm, expression, cb, filters, needSet, deep) {
+function Watcher (vm, expression, cb, options) {
   this.vm = vm
   vm._watcherList.push(this)
   this.expression = expression
   this.cbs = [cb]
   this.id = ++uid // uid for batching
   this.active = true
-  this.deep = deep
+  options = options || {}
+  this.deep = options.deep
+  this.user = options.user
   this.deps = Object.create(null)
   // setup filters if any.
   // We delegate directive filters here to the watcher
   // because they need to be included in the dependency
   // collection process.
-  this.readFilters = filters && filters.read
-  this.writeFilters = filters && filters.write
+  if (options.filters) {
+    this.readFilters = options.filters.read
+    this.writeFilters = options.filters.write
+  }
   // parse expression for getter/setter
-  var res = expParser.parse(expression, needSet)
+  var res = expParser.parse(expression, options.twoWay)
   this.getter = res.get
   this.setter = res.set
   this.value = this.get()
@@ -73,7 +77,12 @@ p.get = function () {
   try {
     value = this.getter.call(vm, vm)
   } catch (e) {
-    _.warn(e)
+    if (config.warnExpressionErrors) {
+      _.warn(
+        'Error when evaluating expression "' +
+        this.expression + '":\n   ' + e
+      )
+    }
   }
   // "touch" every property so they are all tracked as
   // dependencies for deep watching
@@ -98,7 +107,14 @@ p.set = function (value) {
   )
   try {
     this.setter.call(vm, vm, value)
-  } catch (e) {}
+  } catch (e) {
+    if (config.warnExpressionErrors) {
+      _.warn(
+        'Error when evaluating setter "' +
+        this.expression + '":\n   ' + e
+      )
+    }
+  }
 }
 
 /**
@@ -130,10 +146,10 @@ p.afterGet = function () {
  */
 
 p.update = function () {
-  if (config.async) {
-    batcher.push(this)
-  } else {
+  if (!config.async || config.debug) {
     this.run()
+  } else {
+    batcher.push(this)
   }
 }
 
@@ -146,8 +162,9 @@ p.run = function () {
   if (this.active) {
     var value = this.get()
     if (
-      (typeof value === 'object' && value !== null) ||
-      value !== this.value
+      value !== this.value ||
+      Array.isArray(value) ||
+      this.deep
     ) {
       var oldValue = this.value
       this.value = value

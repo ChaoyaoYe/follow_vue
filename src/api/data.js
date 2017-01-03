@@ -77,7 +77,10 @@ exports.$watch = function (exp, cb, deep, immediate) {
   }
   if (!watcher) {
     watcher = vm._userWatchers[key] =
-      new Watcher(vm, exp, wrappedCb, null, false, deep)
+      new Watcher(vm, exp, wrappedCb, {
+        deep: deep,
+        user: true
+      })
   } else {
     watcher.addCb(wrappedCb)
   }

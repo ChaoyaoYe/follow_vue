@@ -110,6 +110,20 @@ if (_.inBrowser) {
       assertObjectPrimitiveMutations(vm, el, done)
     })
 
+    it('array of arrays', function () {
+      var vm = new Vue({
+        el: el,
+        data: {
+          items: [[1,1], [2,2], [3,3]]
+        },
+        template: '<div v-repeat="items">{{$index}} {{$value}}</div>'
+      })
+      var markup = vm.items.map(function (item, i) {
+        return '<div>' + i + ' ' + item.toString() + '</div>'
+      }).join('') + '<!--v-repeat-->'
+      expect(el.innerHTML).toBe(markup)
+    })
+
     it('repeating object with filter', function () {
       var vm = new Vue({
         el: el,
@@ -133,6 +147,23 @@ if (_.inBrowser) {
         template: '<div v-repeat="items" v-component="test"></div>',
         components: {
           test: {
+            template: '<p>{{$index}} {{a}}</p>',
+            replace: true
+          }
+        }
+      })
+      expect(el.innerHTML).toBe('<p>0 1</p><p>1 2</p><p>2 3</p><!--v-repeat-->')
+    })
+
+    it('custom element component', function () {
+      var vm = new Vue({
+        el: el,
+        data: {
+          items: [{a:1}, {a:2}, {a:3}]
+        },
+        template: '<test-component v-repeat="items"></test-component>',
+        components: {
+          'test-component': {
             template: '<p>{{$index}} {{a}}</p>',
             replace: true
           }
