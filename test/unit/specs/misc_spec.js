@@ -26,13 +26,13 @@ describe('Misc', function () {
     var spy1 = jasmine.createSpy('attached')
     var spy2 = jasmine.createSpy('detached')
     var el = document.createElement('div')
-    el.innerHTML = '<div v-component="outter" v-ref="outter"><div v-component="inner"></div></div>'
+    el.innerHTML = '<outer v-ref="outter"><inner></inner></outer>'
     document.body.appendChild(el)
 
     var vm = new Vue({
       el: el,
       components: {
-        outter: {
+        outer: {
           template: '<content></content>'
         },
         inner: {
@@ -45,6 +45,28 @@ describe('Misc', function () {
     expect(spy1).toHaveBeenCalled()
     vm.$.outter.$remove()
     expect(spy2).toHaveBeenCalled()
+  })
+
+  it('v-repeat on component root node with replace:true', function () {
+    var el = document.createElement('div')
+    var vm = new Vue({
+      el: el,
+      template: '<test></test>',
+      components: {
+        test: {
+          data: function () {
+            return { list: [1, 2, 3] }
+          },
+          template: '<div v-repeat="list">{{$value}}</div>',
+          replace: true
+        }
+      }
+    })
+    expect(vm.$el.innerHTML).toBe(
+      '<!--v-start-->' +
+      '<div>1</div><div>2</div><div>3</div><!--v-repeat-->' +
+      '<!--v-end--><!--v-component-->'
+    )
   })
 
 })

@@ -1,4 +1,4 @@
-var uid = 0
+var _ = require('../util')
 
 /**
  * A dep is an observable that can have multiple
@@ -8,7 +8,6 @@ var uid = 0
  */
 
 function Dep () {
-  this.id = ++uid
   this.subs = []
 }
 
@@ -31,10 +30,7 @@ p.addSub = function (sub) {
  */
 
 p.removeSub = function (sub) {
-  if (this.subs.length) {
-    var i = this.subs.indexOf(sub)
-    if (i > -1) this.subs.splice(i, 1)
-  }
+  this.subs.$remove(sub)
 }
 
 /**
@@ -42,8 +38,10 @@ p.removeSub = function (sub) {
  */
 
 p.notify = function () {
-  for (var i = 0, l = this.subs.length; i < l; i++) {
-    this.subs[i].update()
+  // stablize the subscriber list first
+  var subs = _.toArray(this.subs)
+  for (var i = 0, l = subs.length; i < l; i++) {
+    subs[i].update()
   }
 }
 

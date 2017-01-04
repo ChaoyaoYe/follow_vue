@@ -25,12 +25,12 @@ exports._initData = function () {
   // proxy data on instance
   var data = this._data
   var i, key
-  // make sure all paramAttributes properties are observed
-  var params = this.$options.paramAttributes
-  if (params) {
-    i = params.length
+  // make sure all props properties are observed
+  var props = this.$options.props
+  if (props) {
+    i = props.length
     while (i--) {
-      key = _.camelize(params[i])
+      key = _.camelize(props[i])
       if (!(key in data)) {
         data[key] = null
       }

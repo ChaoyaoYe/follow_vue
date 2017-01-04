@@ -21,7 +21,7 @@ exports._compile = function (el) {
   if (options._linkFn) {
     // pre-transcluded with linker, just use it
     this._initElement(el)
-    options._linkFn(this, el)
+    this._unlinkFn = options._linkFn(this, el)
   } else {
     // transclude and init element
     // transclude can potentially replace original
@@ -30,7 +30,7 @@ exports._compile = function (el) {
     el = transclude(el, options)
     this._initElement(el)
     // compile and link the rest
-    compile(el, options)(this, el)
+    this._unlinkFn = compile(el, options)(this, el)
     // finally replace original
     if (options.replace) {
       _.replace(original, el)
@@ -95,14 +95,12 @@ exports._destroy = function (remove, deferCleanup) {
   // if parent is not being destroyed as well.
   var parent = this.$parent
   if (parent && !parent._isBeingDestroyed) {
-    i = parent._children.indexOf(this)
-    parent._children.splice(i, 1)
+    parent._children.$remove(this)
   }
   // same for transclusion host.
   var host = this._host
   if (host && !host._isBeingDestroyed) {
-    i = host._transCpnts.indexOf(this)
-    host._transCpnts.splice(i, 1)
+    host._transCpnts.$remove(this)
   }
   // destroy all children.
   i = this._children.length
@@ -110,11 +108,11 @@ exports._destroy = function (remove, deferCleanup) {
     this._children[i].$destroy()
   }
   // teardown all directives. this also tearsdown all
-  // directive-owned watchers. intentionally check for
-  // directives array length on every loop since directives
-  // that manages partial compilation can splice ones out
-  for (i = 0; i < this._directives.length; i++) {
-    this._directives[i]._teardown()
+  // directive-owned watchers.
+  if (this._unlinkFn) {
+    // passing destroying: true to avoid searching and
+    // splicing the directives
+    this._unlinkFn(true)
   }
   // teardown all user watchers.
   var watcher

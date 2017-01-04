@@ -1,4 +1,4 @@
-var sauceConfig = require('./grunt/sauce')
+var sauceConfig = require('./build/saucelabs-config')
 
 module.exports = function (grunt) {
 
@@ -22,24 +22,11 @@ module.exports = function (grunt) {
       }
     },
 
-    watch: {
-      options: {
-        nospawn: true
-      },
-      dev: {
-        files: ['src/**/*.js'],
-        tasks: ['dev']
-      },
-      test: {
-        files: ['test/unit/specs/**/*.js'],
-        tasks: ['build-test']
-      }
-    },
-
     karma: {
       options: {
         frameworks: ['jasmine', 'commonjs'],
         files: [
+          'test/unit/lib/util.js',
           'test/unit/lib/jquery.js',
           'src/**/*.js',
           'test/unit/specs/**/*.js'
@@ -94,15 +81,15 @@ module.exports = function (grunt) {
   
   // load npm tasks
   grunt.loadNpmTasks('grunt-contrib-jshint')
-  grunt.loadNpmTasks('grunt-contrib-watch')
   grunt.loadNpmTasks('grunt-karma')
   grunt.loadNpmTasks('grunt-karma-coveralls')
 
   // load custom tasks
-  grunt.file.recurse('grunt/tasks', function (path) {
-    require('./' + path)(grunt)
-  })
+  require('./build/grunt-tasks/build')(grunt)
+  require('./build/grunt-tasks/casper')(grunt)
+  require('./build/grunt-tasks/release')(grunt)
 
+  // register composite tasks
   grunt.registerTask('unit', ['karma:browsers'])
   grunt.registerTask('cover', ['karma:coverage'])
   grunt.registerTask('test', ['unit', 'cover', 'casper'])

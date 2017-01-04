@@ -70,7 +70,7 @@ exports.parse = function (text) {
   }
   var tokens = []
   var lastIndex = tagRE.lastIndex = 0
-  var match, index, value, first, oneTime, partial
+  var match, index, value, first, oneTime
   /* jshint boss:true */
   while (match = tagRE.exec(text)) {
     index = match.index
@@ -83,16 +83,14 @@ exports.parse = function (text) {
     // tag token
     first = match[1].charCodeAt(0)
     oneTime = first === 0x2A // *
-    partial = first === 0x3E // >
-    value = (oneTime || partial)
+    value = oneTime
       ? match[1].slice(1)
       : match[1]
     tokens.push({
       tag: true,
       value: value.trim(),
       html: htmlRE.test(match[0]),
-      oneTime: oneTime,
-      partial: partial
+      oneTime: oneTime
     })
     lastIndex = index + match[0].length
   }
@@ -136,9 +134,7 @@ function formatToken (token, vm, single) {
   return token.tag
     ? vm && token.oneTime
       ? '"' + vm.$eval(token.value) + '"'
-      : single
-        ? token.value
-        : inlineFilters(token.value)
+      : inlineFilters(token.value, single)
     : '"' + token.value + '"'
 }
 
@@ -151,13 +147,16 @@ function formatToken (token, vm, single) {
  * to directive parser and watcher mechanism.
  *
  * @param {String} exp
+ * @param {Boolean} single
  * @return {String}
  */
 
 var filterRE = /[^|]\|[^|]/
-function inlineFilters (exp) {
+function inlineFilters (exp, single) {
   if (!filterRE.test(exp)) {
-    return '(' + exp + ')'
+    return single
+      ? exp
+      : '(' + exp + ')'
   } else {
     var dir = dirParser.parse(exp)[0]
     if (!dir.filters) {
@@ -169,9 +168,7 @@ function inlineFilters (exp) {
         var args = filter.args
           ? ',"' + filter.args.join('","') + '"'
           : ''
-        filter = 'this.$options.filters["' + filter.name + '"]'
-        exp = '(' + filter + '.read||' + filter + ')' +
-          '.apply(this,[' + exp + args + '])'
+        exp = 'this._applyFilter("' + filter.name + '",[' + exp + args + '])'
       }
       return exp
     }

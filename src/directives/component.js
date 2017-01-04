@@ -36,12 +36,17 @@ module.exports = {
         // extract inline template as a DocumentFragment
         this.template = _.extractContent(this.el, true)
       }
+      // component resolution related state
+      this._pendingCb =
+      this.ctorId =
+      this.Ctor = null
       // if static, build right now.
       if (!this._isDynamicLiteral) {
-        this.resolveCtor(this.expression)
-        var child = this.build()
-        child.$before(this.ref)
-        this.setCurrent(child)
+        this.resolveCtor(this.expression, _.bind(function () {
+          var child = this.build()
+          child.$before(this.ref)
+          this.setCurrent(child)
+        }, this))
       } else {
         // check dynamic component params
         this.readyEvent = this._checkParam('wait-for')
@@ -60,10 +65,29 @@ module.exports = {
    * the child vm.
    */
 
-  resolveCtor: function (id) {
-    this.ctorId = id
-    this.Ctor = this.vm.$options.components[id]
-    _.assertAsset(this.Ctor, 'component', id)
+  resolveCtor: function (id, cb) {
+    var self = this
+    var pendingCb = this._pendingCb = function (ctor) {
+      if (!pendingCb.invalidated) {
+        self.ctorId = id
+        self.Ctor = ctor
+        cb()
+      }
+    }
+    this.vm._resolveComponent(id, pendingCb)
+  },
+
+  /**
+   * When the component changes or unbinds before an async
+   * constructor is resolved, we need to invalidate its
+   * pending callback.
+   */
+
+  invalidatePending: function () {
+    if (this._pendingCb) {
+      this._pendingCb.invalidated = true
+      this._pendingCb = null
+    }
   },
 
   /**
@@ -138,23 +162,24 @@ module.exports = {
    */
 
   update: function (value) {
+    this.invalidatePending()
     if (!value) {
-      // just destroy and remove current
-      this.unbuild()
+      // just remove current
       this.remove(this.childVM)
       this.unsetCurrent()
     } else {
-      this.resolveCtor(value)
-      this.unbuild()
-      var newComponent = this.build()
-      var self = this
-      if (this.readyEvent) {
-        newComponent.$once(this.readyEvent, function () {
-          self.swapTo(newComponent)
-        })
-      } else {
-        this.swapTo(newComponent)
-      }
+      this.resolveCtor(value, _.bind(function () {
+        this.unbuild()
+        var newComponent = this.build()
+        var self = this
+        if (this.readyEvent) {
+          newComponent.$once(this.readyEvent, function () {
+            self.swapTo(newComponent)
+          })
+        } else {
+          this.swapTo(newComponent)
+        }
+      }, this))
     }
   },
 
@@ -217,6 +242,7 @@ module.exports = {
    */
 
   unbind: function () {
+    this.invalidatePending()
     this.unbuild()
     // destroy all keep-alive cached instances
     if (this.cache) {

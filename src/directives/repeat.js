@@ -9,6 +9,12 @@ var transclude = require('../compiler/transclude')
 var mergeOptions = require('../util/merge-option')
 var uid = 0
 
+// async component resolution states
+var UNRESOLVED = 0
+var PENDING = 1
+var RESOLVED = 2
+var ABORTED = 3
+
 module.exports = {
 
   /**
@@ -85,8 +91,9 @@ module.exports = {
    */
 
   checkComponent: function () {
-    var id = _.attr(this.el, 'component')
+    this.componentState = UNRESOLVED
     var options = this.vm.$options
+    var id = _.checkComponent(this.el, options)
     if (!id) {
       // default constructor
       this.Ctor = _.Vue
@@ -95,8 +102,11 @@ module.exports = {
       // important: transclude with no options, just
       // to ensure block start and block end
       this.template = transclude(this.template)
-      this._linkFn = compile(this.template, options)
+      var copy = _.extend({}, options)
+      copy._asComponent = false
+      this._linkFn = compile(this.template, copy)
     } else {
+      this.Ctor = null
       this.asComponent = true
       // check inline-template
       if (this._checkParam('inline-template') !== null) {
@@ -104,37 +114,112 @@ module.exports = {
         this.inlineTempalte = _.extractContent(this.el, true)
       }
       var tokens = textParser.parse(id)
-      if (!tokens) { // static component
-        var Ctor = this.Ctor = options.components[id]
-        _.assertAsset(Ctor, 'component', id)
-        var merged = mergeOptions(Ctor.options, {}, {
-          $parent: this.vm
-        })
-        merged.template = this.inlineTempalte || merged.template
-        merged._asComponent = true
-        merged._parent = this.vm
-        this.template = transclude(this.template, merged)
-        // Important: mark the template as a root node so that
-        // custom element components don't get compiled twice.
-        // fixes #822
-        this.template.__vue__ = true
-        this._linkFn = compile(this.template, merged)
-      } else {
-        // to be resolved later
+      if (tokens) {
+        // dynamic component to be resolved later
         var ctorExp = textParser.tokensToExp(tokens)
         this.ctorGetter = expParser.parse(ctorExp).get
+      } else {
+        // static
+        this.componentId = id
+        this.pendingData = null
       }
     }
   },
 
+  resolveComponent: function () {
+    this.componentState = PENDING
+    this.vm._resolveComponent(this.componentId, _.bind(function (Ctor) {
+      if (this.componentState === ABORTED) {
+        return
+      }
+      this.Ctor = Ctor
+      var merged = mergeOptions(Ctor.options, {}, {
+        $parent: this.vm
+      })
+      merged.template = this.inlineTempalte || merged.template
+      merged._asComponent = true
+      merged._parent = this.vm
+      this.template = transclude(this.template, merged)
+      // Important: mark the template as a root node so that
+      // custom element components don't get compiled twice.
+      // fixes #822
+      this.template.__vue__ = true
+      this._linkFn = compile(this.template, merged)
+      this.componentState = RESOLVED
+      this.realUpdate(this.pendingData)
+      this.pendingData = null
+    }, this))
+  },
+
+    /**
+   * Resolve a dynamic component to use for an instance.
+   * The tricky part here is that there could be dynamic
+   * components depending on instance data.
+   *
+   * @param {Object} data
+   * @param {Object} meta
+   * @return {Function}
+   */
+
+  resolveDynamicComponent: function (data, meta) {
+    // create a temporary context object and copy data
+    // and meta properties onto it.
+    // use _.define to avoid accidentally overwriting scope
+    // properties.
+    var context = Object.create(this.vm)
+    var key
+    for (key in data) {
+      _.define(context, key, data[key])
+    }
+    for (key in meta) {
+      _.define(context, key, meta[key])
+    }
+    var id = this.ctorGetter.call(context, context)
+    var Ctor = this.vm.$options.components[id]
+    _.assertAsset(Ctor, 'component', id)
+    if (!Ctor.options) {
+      _.warn(
+        'Async resolution is not supported for v-repeat ' +
+        '+ dynamic component. (component: ' + id + ')'
+      )
+      return _.Vue
+    }
+    return Ctor
+  },
+
   /**
    * Update.
-   * This is called whenever the Array mutates.
+   * This is called whenever the Array mutates. If we have
+   * a component, we might need to wait for it to resolve
+   * asynchronously.
    *
    * @param {Array|Number|String} data
    */
 
   update: function (data) {
+    if (this.componentId) {
+      var state = this.componentState
+      if (state === UNRESOLVED) {
+        this.pendingData = data
+        // once resolved, it will call realUpdate
+        this.resolveComponent()
+      } else if (state === PENDING) {
+        this.pendingData = data
+      } else if (state === RESOLVED) {
+        this.realUpdate(data)
+      }
+    } else {
+      this.realUpdate(data)
+    }
+  },
+
+  /**
+   * The real update that actually modifies the DOM.
+   *
+   * @param {Array|Number|String} data
+   */
+
+  realUpdate: function (data) {
     data = data || []
     var type = typeof data
     if (type === 'number') {
@@ -185,18 +270,20 @@ module.exports = {
     for (i = 0, l = data.length; i < l; i++) {
       obj = data[i]
       raw = converted ? obj.$value : obj
-      vm = !init && this.getVm(raw)
+      vm = !init && this.getVm(raw, converted ? obj.$key : null)
       if (vm) { // reusable instance
         vm._reused = true
         vm.$index = i // update $index
-        if (converted) {
-          vm.$key = obj.$key // update $key
-        }
-        if (idKey) { // swap track by id data
+        // update data for track-by or object repeat,
+        // since in these two cases the data is replaced
+        // rather than mutated.
+        if (idKey || converted) {
           if (alias) {
             vm[alias] = raw
+          } else if (_.isPlainObject(raw)) {
+            vm.$data = raw
           } else {
-            vm._setData(raw)
+            vm.$value = raw
           }
         }
       } else { // new instance
@@ -290,7 +377,7 @@ module.exports = {
       data = raw
     }
     // resolve constructor
-    var Ctor = this.Ctor || this.resolveCtor(data, meta)
+    var Ctor = this.Ctor || this.resolveDynamicComponent(data, meta)
     var vm = this.vm.$addChild({
       el: templateParser.clone(this.template),
       _asComponent: this.asComponent,
@@ -306,7 +393,7 @@ module.exports = {
     vm._repeat = true
     // cache instance
     if (needCache) {
-      this.cacheVm(raw, vm)
+      this.cacheVm(raw, vm, this.converted ? meta.$key : null)
     }
     // sync back changes for $value, particularly for
     // two-way bindings of primitive values
@@ -322,39 +409,11 @@ module.exports = {
   },
 
   /**
-   * Resolve a contructor to use for an instance.
-   * The tricky part here is that there could be dynamic
-   * components depending on instance data.
-   *
-   * @param {Object} data
-   * @param {Object} meta
-   * @return {Function}
-   */
-
-  resolveCtor: function (data, meta) {
-    // create a temporary context object and copy data
-    // and meta properties onto it.
-    // use _.define to avoid accidentally overwriting scope
-    // properties.
-    var context = Object.create(this.vm)
-    var key
-    for (key in data) {
-      _.define(context, key, data[key])
-    }
-    for (key in meta) {
-      _.define(context, key, meta[key])
-    }
-    var id = this.ctorGetter.call(context, context)
-    var Ctor = this.vm.$options.components[id]
-    _.assertAsset(Ctor, 'component', id)
-    return Ctor
-  },
-
-  /**
    * Unbind, teardown everything
    */
 
   unbind: function () {
+    this.componentState = ABORTED
     if (this.refID) {
       this.vm.$[this.refID] = null
     }
@@ -379,14 +438,15 @@ module.exports = {
    *
    * @param {Object} data
    * @param {Vue} vm
+   * @param {String} [key]
    */
 
-  cacheVm: function (data, vm) {
+  cacheVm: function (data, vm, key) {
     var idKey = this.idKey
     var cache = this.cache
     var id
-    if (idKey) {
-      id = data[idKey]
+    if (key || idKey) {
+      id = idKey ? data[idKey] : key
       if (!cache[id]) {
         cache[id] = vm
       } else {
@@ -404,7 +464,7 @@ module.exports = {
           )
         }
       } else {
-        _.define(data, this.id, vm)
+        _.define(data, id, vm)
       }
     } else {
       if (!cache[data]) {
@@ -420,12 +480,15 @@ module.exports = {
    * Try to get a cached instance from a piece of data.
    *
    * @param {Object} data
+   * @param {String} [key]
    * @return {Vue|undefined}
    */
 
-  getVm: function (data) {
-    if (this.idKey) {
-      return this.cache[data[this.idKey]]
+  getVm: function (data, key) {
+    var idKey = this.idKey
+    if (key || idKey) {
+      var id = idKey ? data[idKey] : key
+      return this.cache[id]
     } else if (isObject(data)) {
       return data[this.id]
     } else {
@@ -452,8 +515,10 @@ module.exports = {
 
   uncacheVm: function (vm) {
     var data = vm._raw
-    if (this.idKey) {
-      this.cache[data[this.idKey]] = null
+    var idKey = this.idKey
+    if (idKey || this.converted) {
+      var id = idKey ? data[idKey] : vm.$key
+      this.cache[id] = null
     } else if (isObject(data)) {
       data[this.id] = null
       vm._raw = null

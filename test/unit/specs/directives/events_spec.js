@@ -14,7 +14,7 @@ if (_.inBrowser) {
       var spy = jasmine.createSpy('v-events')
       new Vue({
         el: el,
-        template: '<div v-component="test" v-events="test:test"></div>',
+        template: '<test v-events="test:test"></test>',
         methods: {
           test: spy
         },
@@ -34,14 +34,16 @@ if (_.inBrowser) {
         el: el,
         template: '<div v-events="test:test"></div>'
       })
-      expect(_.warn).toHaveBeenCalled()
+      expect(hasWarned(_,
+        'should only be used on a child component ' +
+        'from the parent template')).toBe(true)
     })
 
     it('should warn when used on child component root', function () {
       var spy = jasmine.createSpy('v-events')
       new Vue({
         el: el,
-        template: '<div v-component="test"></div>',
+        template: '<test></test>',
         methods: {
           test: spy
         },
@@ -55,7 +57,9 @@ if (_.inBrowser) {
           }
         }
       })
-      expect(_.warn).toHaveBeenCalled()
+      expect(hasWarned(_,
+        'should only be used on a child component ' +
+        'from the parent template')).toBe(true)
       expect(spy).not.toHaveBeenCalled()
     })
 
@@ -63,19 +67,19 @@ if (_.inBrowser) {
       var vm = new Vue({
         el: el,
         data: { test: 123 },
-        template: '<div v-component="test" v-events="test:test"></div>',
+        template: '<test v-events="test:test"></test>',
         components: {
           test: {}
         }
       })
-      expect(_.warn).toHaveBeenCalled()
+      expect(hasWarned(_, 'expects a function value')).toBe(true)
     })
 
     it('should accept inline statement', function (done) {
       var vm = new Vue({
         el: el,
         data: {a:1},
-        template: '<div v-component="test" v-events="test:a++"></div>',
+        template: '<test v-events="test:a++"></test>',
         components: {
           test: {
             compiled: function () {
@@ -100,7 +104,7 @@ if (_.inBrowser) {
             a++
           }
         },
-        template: '<div v-component="test" v-events="test:handle"></div>',
+        template: '<test v-events="test:handle"></test>',
         components: {
           test: {
             compiled: function () {

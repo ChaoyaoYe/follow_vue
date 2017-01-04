@@ -33,6 +33,7 @@ function Directive (name, el, vm, descriptor, def, host) {
   this.arg = descriptor.arg
   this.filters = _.resolveFilters(vm, descriptor.filters)
   // private
+  this._descriptor = descriptor
   this._host = host
   this._locked = false
   this._bound = false
@@ -141,7 +142,7 @@ p._checkStatement = function () {
   var expression = this.expression
   if (
     expression && this.acceptStatement &&
-    !expParser.pathTestRE.test(expression)
+    !expParser.isSimplePath(expression)
   ) {
     var fn = expParser.parse(expression).get
     var vm = this.vm

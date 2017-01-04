@@ -3,6 +3,7 @@ var _ = require('../../../../src/util')
 var dirParser = require('../../../../src/parsers/directive')
 var merge = require('../../../../src/util/merge-option')
 var compile = require('../../../../src/compiler/compile')
+var transclude = require('../../../../src/compiler/transclude')
 
 if (_.inBrowser) {
   describe('Compile', function () {
@@ -28,6 +29,12 @@ if (_.inBrowser) {
         },
         $interpolate: function (value) {
           return data[value]
+        },
+        $parent: {
+          _directives: [],
+          $get: function (v) {
+            return 'from parent: ' + v
+          }
         }
       }
       spyOn(vm, '_bindDir').and.callThrough()
@@ -82,27 +89,20 @@ if (_.inBrowser) {
       expect(el.innerHTML).toBe('  and yeah')
     })
 
-    it('inline html and partial', function () {
-      data.html = 'yoyoyo'
-      el.innerHTML = '{{{html}}} {{{*html}}} {{>partial}}'
+    it('inline html', function () {
+      data.html = '<div>yoyoyo</div>'
+      el.innerHTML = '{{{html}}} {{{*html}}}'
       var htmlDef = Vue.options.directives.html
-      var partialDef = Vue.options.directives.partial
       var htmlDesc = dirParser.parse('html')[0]
-      var partialDesc = dirParser.parse('partial')[0]
       var linker = compile(el, Vue.options)
       linker(vm, el)
-      expect(vm._bindDir.calls.count()).toBe(2)
+      expect(vm._bindDir.calls.count()).toBe(1)
       var htmlArgs = vm._bindDir.calls.argsFor(0)
       expect(htmlArgs[0]).toBe('html')
       expect(htmlArgs[2]).toBe(htmlDesc)
       expect(htmlArgs[3]).toBe(htmlDef)
-      var partialArgs = vm._bindDir.calls.argsFor(1)
-      expect(partialArgs[0]).toBe('partial')
-      expect(partialArgs[2]).toBe(partialDesc)
-      expect(partialArgs[3]).toBe(partialDef)
-      expect(vm.$eval).toHaveBeenCalledWith('html')
       // with placeholder comments & interpolated one-time html
-      expect(el.innerHTML).toBe('<!--v-html--> yoyoyo <!--v-partial-->')
+      expect(el.innerHTML).toBe('<!--v-html--> <div>yoyoyo</div>')
     })
 
     it('terminal directives', function () {
@@ -126,12 +126,10 @@ if (_.inBrowser) {
         }
       })
       el.innerHTML = '<my-component><div v-a="b"></div></my-component>'
-      var def = Vue.options.directives.component
-      var descriptor = dirParser.parse('my-component')[0]
       var linker = compile(el, options)
       linker(vm, el)
       expect(vm._bindDir.calls.count()).toBe(1)
-      expect(vm._bindDir).toHaveBeenCalledWith('component', el.firstChild, descriptor, def, undefined)
+      expect(vm._bindDir.calls.argsFor(0)[0]).toBe('component')
       expect(_.warn).not.toHaveBeenCalled()
     })
 
@@ -147,27 +145,63 @@ if (_.inBrowser) {
       expect(el.firstChild.getAttribute('b')).toBe('B')
     })
 
-    it('param attributes', function () {
+    it('props', function () {
       var options = merge(Vue.options, {
-        paramAttributes: ['a', 'data-some-attr', 'some-other-attr', 'invalid', 'camelCase']
+        _asComponent: true,
+        props: [
+          'a',
+          'data-some-attr',
+          'some-other-attr',
+          'multiple-attrs',
+          'oneway',
+          'with-filter',
+          'camelCase'
+        ]
       })
-      var def = Vue.options.directives['with']
+      var def = Vue.options.directives._prop
       el.setAttribute('a', '1')
       el.setAttribute('data-some-attr', '{{a}}')
       el.setAttribute('some-other-attr', '2')
-      el.setAttribute('invalid', 'a {{b}} c') // invalid
+      el.setAttribute('multiple-attrs', 'a {{b}} c')
+      el.setAttribute('oneway', '{{*a}}')
+      el.setAttribute('with-filter', '{{a | filter}}')
+      transclude(el, options)
       var linker = compile(el, options)
       linker(vm, el)
-      // should skip literal & invliad
-      expect(vm._bindDir.calls.count()).toBe(1)
+      // should skip literals and one-time bindings
+      expect(vm._bindDir.calls.count()).toBe(4)
+      // data-some-attr
       var args = vm._bindDir.calls.argsFor(0)
-      expect(args[0]).toBe('with')
-      expect(args[1]).toBe(el)
+      expect(args[0]).toBe('prop')
+      expect(args[1]).toBe(null)
       expect(args[2].arg).toBe('someAttr')
+      expect(args[2].expression).toBe('a')
       expect(args[3]).toBe(def)
-      // invalid and camelCase should've warn
-      expect(_.warn.calls.count()).toBe(2)
-      // literal should've called vm.$set
+      // multiple-attrs
+      args = vm._bindDir.calls.argsFor(1)
+      expect(args[0]).toBe('prop')
+      expect(args[1]).toBe(null)
+      expect(args[2].arg).toBe('multipleAttrs')
+      expect(args[2].expression).toBe('"a "+(b)+" c"')
+      expect(args[3]).toBe(def)
+      // oneway
+      args = vm._bindDir.calls.argsFor(2)
+      expect(args[0]).toBe('prop')
+      expect(args[1]).toBe(null)
+      expect(args[2].arg).toBe('oneway')
+      expect(args[2].oneWay).toBe(true)
+      expect(args[2].expression).toBe('a')
+      expect(args[3]).toBe(def)
+      // with-filter
+      args = vm._bindDir.calls.argsFor(3)
+      expect(args[0]).toBe('prop')
+      expect(args[1]).toBe(null)
+      expect(args[2].arg).toBe('withFilter')
+      expect(args[2].expression).toBe('this._applyFilter("filter",[a])')
+      expect(args[3]).toBe(def)
+      // camelCase should've warn
+      expect(_.warn.calls.count()).toBe(1)
+      // literal and one time should've called vm.$set
       expect(vm.$set).toHaveBeenCalledWith('a', '1')
       expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', '2')
     })
@@ -208,35 +242,130 @@ if (_.inBrowser) {
       vm = new Vue({
         el: el,
         template:
-          '<div v-component="a">' +
-            '<div v-component="b">' +
+          '<testa>' +
+            '<testb>' +
               '<div v-repeat="list">{{$value}}</div>' +
-            '</div>' +
-          '</div>',
+            '</testb>' +
+          '</testa>',
         data: {
           list: [1,2]
         },
         components: {
-          a: { template: '<content></content>' },
-          b: { template: '<content></content>' }
+          testa: { template: '<content></content>' },
+          testb: { template: '<content></content>' }
         }
       })
       expect(el.innerHTML).toBe(
-        '<div><div>' +
+        '<testa><testb>' +
           '<div>1</div><div>2</div><!--v-repeat-->' +
-        '</div><!--v-component-->' +
-        '</div><!--v-component-->'
+        '</testb><!--v-component-->' +
+        '</testa><!--v-component-->'
       )
       vm.list.push(3)
       _.nextTick(function () {
         expect(el.innerHTML).toBe(
-          '<div><div>' +
+          '<testa><testb>' +
             '<div>1</div><div>2</div><div>3</div><!--v-repeat-->' +
-          '</div><!--v-component-->' +
-          '</div><!--v-component-->'
+          '</testb><!--v-component-->' +
+          '</testa><!--v-component-->'
         )
         done()
       })
+    })
+
+    it('should handle container/replacer directives with same name', function () {
+      var parentSpy = jasmine.createSpy()
+      var childSpy = jasmine.createSpy()
+      vm = new Vue({
+        el: el,
+        template:
+          '<test class="a" v-on="click:test(1)"></test>',
+        methods: {
+          test: parentSpy
+        },
+        components: {
+          test: {
+            template: '<div class="b" v-on="click:test(2)"></div>',
+            replace: true,
+            methods: {
+              test: childSpy
+            }
+          }
+        }
+      })
+      expect(vm.$el.firstChild.className).toBe('b a')
+      var e = document.createEvent('HTMLEvents')
+      e.initEvent('click', true, true)
+      vm.$el.firstChild.dispatchEvent(e)
+      expect(parentSpy).toHaveBeenCalledWith(1)
+      expect(childSpy).toHaveBeenCalledWith(2)
+    })
+
+    it('should remove transcluded directives from parent when unlinking (v-component)', function () {
+      var vm = new Vue({
+        el: el,
+        template:
+          '<test>{{test}}</test>',
+        data: {
+          test: 'parent'
+        },
+        components: {
+          test: {
+            template: '<content></content>'
+          }
+        }
+      })
+      expect(vm.$el.textContent).toBe('parent')
+      expect(vm._directives.length).toBe(2)
+      expect(vm._children.length).toBe(1)
+      vm._children[0].$destroy()
+      expect(vm._directives.length).toBe(1)
+      expect(vm._children.length).toBe(0)
+    })
+
+    it('should remove transcluded directives from parent when unlinking (v-if + v-component)', function (done) {
+      var vm = new Vue({
+        el: el,
+        template:
+          '<div v-if="ok">' +
+            '<test>{{test}}</test>' +
+          '</div>',
+        data: {
+          test: 'parent',
+          ok: true
+        },
+        components: {
+          test: {
+            template: '<content></content>'
+          }
+        }
+      })
+      expect(vm.$el.textContent).toBe('parent')
+      expect(vm._directives.length).toBe(3)
+      expect(vm._children.length).toBe(1)
+      vm.ok = false
+      _.nextTick(function () {
+        expect(vm.$el.textContent).toBe('')
+        expect(vm._directives.length).toBe(1)
+        expect(vm._children.length).toBe(0)
+        done()
+      })
+    })
+
+    it('element directive', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<test>{{a}}</test>',
+        elementDirectives: {
+          test: {
+            bind: function () {
+              this.el.setAttribute('test', '1')
+            }
+          }
+        }
+      })
+      // should be terminal
+      expect(el.innerHTML).toBe('<test test="1">{{a}}</test>')
     })
 
   })

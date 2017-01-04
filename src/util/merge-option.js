@@ -113,7 +113,7 @@ strats.beforeCompile =
 strats.compiled =
 strats.beforeDestroy =
 strats.destroyed =
-strats.paramAttributes = function (parentVal, childVal) {
+strats.props = function (parentVal, childVal) {
   return childVal
     ? parentVal
       ? parentVal.concat(childVal)
@@ -133,9 +133,9 @@ strats.paramAttributes = function (parentVal, childVal) {
 
 strats.directives =
 strats.filters =
-strats.partials =
 strats.transitions =
-strats.components = function (parentVal, childVal, vm, key) {
+strats.components =
+strats.elementDirectives = function (parentVal, childVal, vm, key) {
   var ret = Object.create(
     vm && vm.$parent
       ? vm.$parent.$options[key]
@@ -170,7 +170,7 @@ strats.events = function (parentVal, childVal) {
   for (var key in childVal) {
     var parent = ret[key]
     var child = childVal[key]
-    if (!_.isArray(parent)) {
+    if (parent && !_.isArray(parent)) {
       parent = [parent]
     }
     ret[key] = parent
