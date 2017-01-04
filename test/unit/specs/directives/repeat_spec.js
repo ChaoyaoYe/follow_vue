@@ -172,6 +172,23 @@ if (_.inBrowser) {
       assertMutations(vm, el, done)
     })
 
+    it('v-component with inline-template on <template>', function (done) {
+      var vm = new Vue({
+        el: el,
+        data: {
+          items: [{a:1}, {a:2}]
+        },
+        template:
+          '<template v-repeat="items" v-component="test" inline-template>' +
+            '<div>{{$index}} {{a}}</div>' +
+          '</template>',
+        components: {
+          test: {}
+        }
+      })
+      assertMutations(vm, el, done, true)
+    })
+
     it('v-component with primitive values', function (done) {
       var vm = new Vue({
         el: el,
@@ -218,6 +235,27 @@ if (_.inBrowser) {
         template: '<test-component v-repeat="items"></test-component>',
         components: {
           'test-component': {
+            template: '{{$index}} {{a}}'
+          }
+        }
+      })
+      expect(el.innerHTML).toBe(
+        '<test-component>0 1</test-component>' +
+        '<test-component>1 2</test-component>' +
+        '<test-component>2 3</test-component>' +
+        '<!--v-repeat-->'
+      )
+    })
+
+    it('custom element component with replace:true', function () {
+      var vm = new Vue({
+        el: el,
+        data: {
+          items: [{a:1}, {a:2}, {a:3}]
+        },
+        template: '<test-component v-repeat="items"></test-component>',
+        components: {
+          'test-component': {
             template: '<p>{{$index}} {{a}}</p>',
             replace: true
           }
@@ -256,7 +294,7 @@ if (_.inBrowser) {
           }
         },
         template: '<div v-repeat="listHash">{{$key}}' +
-            '<p v-repeat="$data">{{a}}</p>' +
+            '<p v-repeat="$value">{{a}}</p>' +
             '</div>'
       })
       function output(key){
@@ -314,7 +352,7 @@ if (_.inBrowser) {
       expect(el.innerHTML).toBe('<div>AAA</div><div>BBB</div><div>CCC</div><!--v-repeat-->')
     })
 
-    it('block repeat', function () {
+    it('block repeat', function (done) {
       var vm = new Vue({
         el: el,
         template: '<template v-repeat="list"><p>{{a}}</p><p>{{a + 1}}</p></template>',
@@ -326,10 +364,52 @@ if (_.inBrowser) {
           ]
         }
       })
-      var markup = vm.list.map(function (item) {
-        return '<!--v-start--><p>' + item.a + '</p><p>' + (item.a + 1) + '</p><!--v-end-->'
-      }).join('')
-      expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+      assertMarkup()
+      vm.list.reverse()
+      _.nextTick(function () {
+        assertMarkup()
+        done()
+      })
+
+      function assertMarkup () {
+        var markup = vm.list.map(function (item) {
+          return '<!--v-start--><p>' + item.a + '</p><p>' + (item.a + 1) + '</p><!--v-end-->'
+        }).join('')
+        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+      }
+    })
+
+    // added for #799
+    it('block repeat with diff', function (done) {
+      var vm = new Vue({
+        el: el,
+        template: '<template v-repeat="list" v-component="test"></template>',
+        data: {
+          list: [
+            { a: 1 },
+            { a: 2 },
+            { a: 3 }
+          ]
+        },
+        components: {
+          test: {
+            template: '<p>{{a}}</p><p>{{a + 1}}</p>'
+          }
+        }
+      })
+      assertMarkup()
+      vm.list.reverse()
+      _.nextTick(function () {
+        assertMarkup()
+        done()
+      })
+
+      function assertMarkup () {
+        var markup = vm.list.map(function (item) {
+          return '<!--v-start--><p>' + item.a + '</p><p>' + (item.a + 1) + '</p><!--v-end-->'
+        }).join('')
+        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+      }
     })
 
     it('component + parent directive + transclusion', function (done) {
@@ -711,7 +791,7 @@ function go (fn, cb) {
  * an Array of Objects
  */
 
-function assertMutations (vm, el, done) {
+function assertMutations (vm, el, done, isBlock) {
   assertMarkup()
   var poppedItem
   go(
@@ -769,7 +849,9 @@ function assertMutations (vm, el, done) {
 
   function assertMarkup () {
     var markup = vm.items.map(function (item, i) {
-      return '<div>' + i + ' ' + item.a + '</div>'
+      var el = '<div>' + i + ' ' + item.a + '</div>'
+      if (isBlock) el = '<!--v-start-->' + el + '<!--v-end-->'
+      return el
     }).join('')
     expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
   }

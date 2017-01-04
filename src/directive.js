@@ -18,10 +18,11 @@ var expParser = require('./parsers/expression')
  *                 - {String} [arg]
  *                 - {Array<Object>} [filters]
  * @param {Object} def - directive definition object
+ * @param {Vue|undefined} host - transclusion host target
  * @constructor
  */
 
-function Directive (name, el, vm, descriptor, def) {
+function Directive (name, el, vm, descriptor, def, host) {
   // public
   this.name = name
   this.el = el
@@ -32,6 +33,7 @@ function Directive (name, el, vm, descriptor, def) {
   this.arg = descriptor.arg
   this.filters = _.resolveFilters(vm, descriptor.filters)
   // private
+  this._host = host
   this._locked = false
   this._bound = false
   // init
@@ -49,7 +51,7 @@ var p = Directive.prototype
  */
 
 p._bind = function (def) {
-  if (this.name !== 'cloak' && this.el.removeAttribute) {
+  if (this.name !== 'cloak' && this.el && this.el.removeAttribute) {
     this.el.removeAttribute(config.prefix + this.name)
   }
   if (typeof def === 'function') {

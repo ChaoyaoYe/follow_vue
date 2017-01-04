@@ -59,15 +59,69 @@ if (_.inBrowser) {
       expect(spy).not.toHaveBeenCalled()
     })
 
-    it('should warn when method not found on parent', function () {
-      new Vue({
+    it('should warn on non-function values', function () {
+      var vm = new Vue({
         el: el,
+        data: { test: 123 },
         template: '<div v-component="test" v-events="test:test"></div>',
         components: {
           test: {}
         }
       })
       expect(_.warn).toHaveBeenCalled()
+    })
+
+    it('should accept inline statement', function (done) {
+      var vm = new Vue({
+        el: el,
+        data: {a:1},
+        template: '<div v-component="test" v-events="test:a++"></div>',
+        components: {
+          test: {
+            compiled: function () {
+              this.$emit('test')
+            }
+          }
+        }
+      })
+      _.nextTick(function () {
+        expect(vm.a).toBe(2)
+        done()
+      })
+    })
+
+    it('should be able to switch handlers if not a method', function (done) {
+      var a = 0
+      var b = 0
+      var vm = new Vue({
+        el: el,
+        data: {
+          handle: function () {
+            a++
+          }
+        },
+        template: '<div v-component="test" v-events="test:handle"></div>',
+        components: {
+          test: {
+            compiled: function () {
+              this.$emit('test')
+            }
+          }
+        }
+      })
+      _.nextTick(function () {
+        expect(a).toBe(1)
+        expect(b).toBe(0)
+        vm.handle = function () {
+          b++
+        }
+        _.nextTick(function () {
+          vm._children[0].$emit('test')
+          expect(a).toBe(1)
+          expect(b).toBe(1)
+          done()
+        })
+      })
     })
 
   })

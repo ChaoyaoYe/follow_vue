@@ -18,55 +18,22 @@ var transclude = require('../compiler/transclude')
 
 exports._compile = function (el) {
   var options = this.$options
-  var parent = options._parent
   if (options._linkFn) {
+    // pre-transcluded with linker, just use it
     this._initElement(el)
     options._linkFn(this, el)
   } else {
-    var raw = el
-    if (options._asComponent) {
-      // separate container element and content
-      var content = options._content = _.extractContent(raw)
-      // create two separate linekrs for container and content
-      var parentOptions = parent.$options
-      
-      // hack: we need to skip the paramAttributes for this
-      // child instance when compiling its parent container
-      // linker. there could be a better way to do this.
-      parentOptions._skipAttrs = options.paramAttributes
-      var containerLinkFn =
-        compile(raw, parentOptions, true, true)
-      parentOptions._skipAttrs = null
-
-      if (content) {
-        var ol = parent._children.length
-        var contentLinkFn =
-          compile(content, parentOptions, true)
-        // call content linker now, before transclusion
-        this._contentUnlinkFn = contentLinkFn(parent, content)
-        // mark all compiled nodes as transcluded, so that
-        // directives that do partial compilation, e.g. v-if
-        // and v-partial can detect them and persist them
-        // through re-compilations.
-        for (var i = 0; i < content.childNodes.length; i++) {
-          content.childNodes[i]._isContent = true
-        }
-        this._transCpnts = parent._children.slice(ol)
-      }
-      // tranclude, this possibly replaces original
-      el = transclude(el, options)
-      this._initElement(el)
-      // now call the container linker on the resolved el
-      this._containerUnlinkFn = containerLinkFn(parent, el)
-    } else {
-      // simply transclude
-      el = transclude(el, options)
-      this._initElement(el)
-    }
-    var linkFn = compile(el, options)
-    linkFn(this, el)
+    // transclude and init element
+    // transclude can potentially replace original
+    // so we need to keep reference
+    var original = el
+    el = transclude(el, options)
+    this._initElement(el)
+    // compile and link the rest
+    compile(el, options)(this, el)
+    // finally replace original
     if (options.replace) {
-      _.replace(raw, el)
+      _.replace(original, el)
     }
   }
   return el
@@ -82,8 +49,7 @@ exports._compile = function (el) {
 exports._initElement = function (el) {
   if (el instanceof DocumentFragment) {
     this._isBlock = true
-    this._blockStart = el.firstChild
-    this.$el = el.childNodes[1]
+    this.$el = this._blockStart = el.firstChild
     this._blockEnd = el.lastChild
     this._blockFragment = el
   } else {
@@ -100,11 +66,12 @@ exports._initElement = function (el) {
  * @param {Node} node   - target node
  * @param {Object} desc - parsed directive descriptor
  * @param {Object} def  - directive definition object
+ * @param {Vue|undefined} host - transclusion host component
  */
 
-exports._bindDir = function (name, node, desc, def) {
+exports._bindDir = function (name, node, desc, def, host) {
   this._directives.push(
-    new Directive(name, node, this, desc, def)
+    new Directive(name, node, this, desc, def, host)
   )
 }
 
@@ -131,17 +98,16 @@ exports._destroy = function (remove, deferCleanup) {
     i = parent._children.indexOf(this)
     parent._children.splice(i, 1)
   }
+  // same for transclusion host.
+  var host = this._host
+  if (host && !host._isBeingDestroyed) {
+    i = host._transCpnts.indexOf(this)
+    host._transCpnts.splice(i, 1)
+  }
   // destroy all children.
   i = this._children.length
   while (i--) {
     this._children[i].$destroy()
-  }
-  // teardown parent linkers
-  if (this._containerUnlinkFn) {
-    this._containerUnlinkFn()
-  }
-  if (this._contentUnlinkFn) {
-    this._contentUnlinkFn()
   }
   // teardown all directives. this also tearsdown all
   // directive-owned watchers. intentionally check for

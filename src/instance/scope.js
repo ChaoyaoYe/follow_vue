@@ -24,9 +24,20 @@ exports._initScope = function () {
 exports._initData = function () {
   // proxy data on instance
   var data = this._data
+  var i, key
+  // make sure all paramAttributes properties are observed
+  var params = this.$options.paramAttributes
+  if (params) {
+    i = params.length
+    while (i--) {
+      key = _.camelize(params[i])
+      if (!(key in data)) {
+        data[key] = null
+      }
+    }
+  }
   var keys = Object.keys(data)
-  var i = keys.length
-  var key
+  i = keys.length
   while (i--) {
     key = keys[i]
     if (!_.isReserved(key)) {
@@ -120,7 +131,7 @@ exports._digest = function () {
   i = children.length
   while (i--) {
     var child = children[i]
-    if (!child._repeat && child.$options.inherit) {
+    if (child.$options.inherit) {
       child._digest()
     }
   }

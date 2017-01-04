@@ -1,5 +1,7 @@
 var _ = require('../util')
 var Watcher = require('../watcher')
+var expParser = require('../parsers/expression')
+var literalRE = /^(true|false|\s?('[^']*'|"[^"]")\s?)$/
 
 module.exports = {
 
@@ -12,7 +14,7 @@ module.exports = {
     var childKey = this.arg || '$data'
     var parentKey = this.expression
 
-    if (this.el !== child.$el) {
+    if (this.el && this.el !== child.$el) {
       _.warn(
         'v-with can only be used on instance root elements.'
       )
@@ -20,6 +22,17 @@ module.exports = {
       _.warn(
         'v-with must be used on an instance with a parent.'
       )
+    } else if (literalRE.test(parentKey)) {
+      // no need to setup watchers for literal bindings
+      if (!this.arg) {
+        _.warn(
+          'v-with cannot bind literal value as $data: ' +
+          parentKey
+        )
+      } else {
+        var value = expParser.parse(parentKey).get()
+        child.$set(childKey, value)
+      }
     } else {
 
       // simple lock to avoid circular updates.

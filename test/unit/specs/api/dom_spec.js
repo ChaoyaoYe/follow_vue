@@ -41,6 +41,7 @@ if (_.inBrowser) {
       it('block instance', function () {
         vm2.$appendTo(parent, spy)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[2]).toBe(vm2._blockStart)
         expect(parent.childNodes[2]).toBe(vm2.$el)
         expect(parent.childNodes[3].tagName).toBe('P')
         expect(parent.childNodes[4].tagName).toBe('SPAN')
@@ -66,6 +67,7 @@ if (_.inBrowser) {
       it('block instance', function () {
         vm2.$prependTo(parent, spy)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[0]).toBe(vm2._blockStart)
         expect(parent.childNodes[0]).toBe(vm2.$el)
         expect(parent.childNodes[1].tagName).toBe('P')
         expect(parent.childNodes[2].tagName).toBe('SPAN')
@@ -74,6 +76,7 @@ if (_.inBrowser) {
         // empty
         vm2.$prependTo(empty, spy)
         expect(empty.childNodes.length).toBe(4)
+        expect(empty.childNodes[0]).toBe(vm2._blockStart)
         expect(empty.childNodes[0]).toBe(vm2.$el)
         expect(empty.childNodes[1].tagName).toBe('P')
         expect(empty.childNodes[2].tagName).toBe('SPAN')
@@ -95,6 +98,7 @@ if (_.inBrowser) {
       it('block instance', function () {
         vm2.$before(sibling, spy)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[1]).toBe(vm2._blockStart)
         expect(parent.childNodes[1]).toBe(vm2.$el)
         expect(parent.childNodes[2].tagName).toBe('P')
         expect(parent.childNodes[3].tagName).toBe('SPAN')
@@ -123,6 +127,7 @@ if (_.inBrowser) {
       it('block instance', function () {
         vm2.$after(target, spy)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[1]).toBe(vm2._blockStart)
         expect(parent.childNodes[1]).toBe(vm2.$el)
         expect(parent.childNodes[2].tagName).toBe('P')
         expect(parent.childNodes[3].tagName).toBe('SPAN')
@@ -133,6 +138,7 @@ if (_.inBrowser) {
       it('block instance no next sibling', function () {
         vm2.$after(sibling, spy)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[2]).toBe(vm2._blockStart)
         expect(parent.childNodes[2]).toBe(vm2.$el)
         expect(parent.childNodes[3].tagName).toBe('P')
         expect(parent.childNodes[4].tagName).toBe('SPAN')
@@ -158,6 +164,7 @@ if (_.inBrowser) {
       it('block instance', function () {
         vm2.$before(sibling)
         expect(parent.childNodes.length).toBe(6)
+        expect(parent.childNodes[1]).toBe(vm2._blockStart)
         expect(parent.childNodes[1]).toBe(vm2.$el)
         expect(parent.childNodes[2].tagName).toBe('P')
         expect(parent.childNodes[3].tagName).toBe('SPAN')

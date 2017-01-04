@@ -1,5 +1,4 @@
 var _ = require('../util')
-var config = require('../config')
 var isObject = _.isObject
 var isPlainObject = _.isPlainObject
 var textParser = require('../parsers/text')
@@ -49,7 +48,6 @@ module.exports = {
       this._checkParam('track-by') ||
       this._checkParam('trackby') // 0.11.0 compat
     this.cache = Object.create(null)
-    this.checkUpdateStrategy()
   },
 
   /**
@@ -90,8 +88,10 @@ module.exports = {
     var id = _.attr(this.el, 'component')
     var options = this.vm.$options
     if (!id) {
-      this.Ctor = _.Vue // default constructor
-      this.inherit = true // inline repeats should inherit
+      // default constructor
+      this.Ctor = _.Vue
+      // inline repeats should inherit
+      this.inherit = true
       // important: transclude with no options, just
       // to ensure block start and block end
       this.template = transclude(this.template)
@@ -107,51 +107,24 @@ module.exports = {
       if (!tokens) { // static component
         var Ctor = this.Ctor = options.components[id]
         _.assertAsset(Ctor, 'component', id)
-        // If there's no parent scope directives and no
-        // content to be transcluded, we can optimize the
-        // rendering by pre-transcluding + compiling here
-        // and provide a link function to every instance.
-        if (!this.el.hasChildNodes() &&
-            !this.el.hasAttributes()) {
-          // merge an empty object with owner vm as parent
-          // so child vms can access parent assets.
-          var merged = mergeOptions(Ctor.options, {}, {
-            $parent: this.vm
-          })
-          merged.template = this.inlineTempalte || merged.template
-          this.template = transclude(this.template, merged)
-          this._linkFn = compile(this.template, merged, false, true)
-        }
+        var merged = mergeOptions(Ctor.options, {}, {
+          $parent: this.vm
+        })
+        merged.template = this.inlineTempalte || merged.template
+        merged._asComponent = true
+        merged._parent = this.vm
+        this.template = transclude(this.template, merged)
+        // Important: mark the template as a root node so that
+        // custom element components don't get compiled twice.
+        // fixes #822
+        this.template.__vue__ = true
+        this._linkFn = compile(this.template, merged)
       } else {
         // to be resolved later
         var ctorExp = textParser.tokensToExp(tokens)
         this.ctorGetter = expParser.parse(ctorExp).get
       }
     }
-  },
-
-  /**
-   * Check what strategy to use for updates.
-   * 
-   * If the repeat is simple enough we can use in-place
-   * updates which simply overwrites existing instances'
-   * data. This strategy reuses DOM nodes and instances
-   * as much as possible.
-   * 
-   * There are two situations where we have to use the
-   * more complex but more accurate diff algorithm:
-   * 1. We are using components with or inside v-repeat.
-   *    The components could have private state that needs
-   *    to be preserved across updates.
-   * 2. We have transitions on the list, which requires
-   *    precise DOM re-positioning.
-   */
-
-  checkUpdateStrategy: function () {
-    this.needDiff =
-      this.asComponent ||
-      this.el.hasAttribute(config.prefix + 'transition') ||
-      this.template.querySelector('[' + config.prefix + 'component]')
   },
 
   /**
@@ -169,9 +142,7 @@ module.exports = {
     } else if (type === 'string') {
       data = _.toArray(data)
     }
-    this.vms = this.needDiff
-      ? this.diff(data, this.vms)
-      : this.inplaceUpdate(data, this.vms)
+    this.vms = this.diff(data, this.vms)
     // update v-ref
     if (this.refID) {
       this.vm.$[this.refID] = this.vms
@@ -181,43 +152,6 @@ module.exports = {
         return vm.$el
       })
     }
-  },
-
-  /**
-   * Inplace update that maximally reuses existing vm
-   * instances and DOM nodes by simply swapping data into
-   * existing vms.
-   *
-   * @param {Array} data
-   * @param {Array} oldVms
-   * @return {Array}
-   */
-
-  inplaceUpdate: function (data, oldVms) {
-    oldVms = oldVms || []
-    var vms
-    var dir = this
-    var alias = dir.arg
-    var converted = dir.converted
-    if (data.length < oldVms.length) {
-      oldVms.slice(data.length).forEach(function (vm) {
-        vm.$destroy(true)
-      })
-      vms = oldVms.slice(0, data.length)
-      overwrite(data, vms, alias, converted)
-    } else if (data.length > oldVms.length) {
-      var newVms = data.slice(oldVms.length).map(function (data, i) {
-        var vm = dir.build(data, i + oldVms.length)
-        vm.$before(dir.ref)
-        return vm
-      })
-      overwrite(data.slice(0, oldVms.length), oldVms, alias, converted)
-      vms = oldVms.concat(newVms)
-    } else {
-      overwrite(data, oldVms, alias, converted)
-      vms = oldVms
-    }
-    return vms
   },
 
   /**
@@ -309,17 +243,18 @@ module.exports = {
           vm.$before(ref)
         }
       } else {
+        var nextEl = targetNext.$el
         if (vm._reused) {
           // this is the vm we are actually in front of
           currentNext = findNextVm(vm, ref)
           // we only need to move if we are not in the right
           // place already.
           if (currentNext !== targetNext) {
-            vm.$before(targetNext.$el, null, false)
+            vm.$before(nextEl, null, false)
           }
         } else {
           // new instance, insert to existing next
-          vm.$before(targetNext.$el)
+          vm.$before(nextEl)
         }
       }
       vm._new = false
@@ -337,26 +272,29 @@ module.exports = {
    */
 
   build: function (data, index, needCache) {
-    var original = data
     var meta = { $index: index }
     if (this.converted) {
-      meta.$key = original.$key
+      meta.$key = data.$key
     }
     var raw = this.converted ? data.$value : data
     var alias = this.arg
-    var hasAlias = !isObject(raw) || !isPlainObject(data) || alias
-    // wrap the raw data with alias
-    data = hasAlias ? {} : raw
     if (alias) {
+      data = {}
       data[alias] = raw
-    } else if (hasAlias) {
+    } else if (!isPlainObject(raw)) {
+      // non-object values
+      data = {}
       meta.$value = raw
+    } else {
+      // default
+      data = raw
     }
     // resolve constructor
     var Ctor = this.Ctor || this.resolveCtor(data, meta)
     var vm = this.vm.$addChild({
       el: templateParser.clone(this.template),
       _asComponent: this.asComponent,
+      _host: this._host,
       _linkFn: this._linkFn,
       _meta: meta,
       data: data,
@@ -425,9 +363,7 @@ module.exports = {
       var vm
       while (i--) {
         vm = this.vms[i]
-        if (this.needDiff) {
-          this.uncacheVm(vm)
-        }
+        this.uncacheVm(vm)
         vm.$destroy()
       }
     }
@@ -598,33 +534,4 @@ function range (n) {
     ret[i] = i
   }
   return ret
-}
-
-/**
- * Helper function to overwrite new data Array on to
- * existing vms. Used in `inplaceUpdate`.
- *
- * @param {Array} arr
- * @param {Array} vms
- * @param {String|undefined} alias
- * @param {Boolean} converted
- */
-
-function overwrite (arr, vms, alias, converted) {
-  var vm, data, raw
-  for (var i = 0, l = arr.length; i < l; i++) {
-    vm = vms[i]
-    data = raw = arr[i]
-    if (converted) {
-      vm.$key = data.$key
-      raw = data.$value
-    }
-    if (alias) {
-      vm[alias] = raw
-    } else if (!isObject(raw)) {
-      vm.$value = raw
-    } else {
-      vm._setData(raw)
-    }
-  }
 }

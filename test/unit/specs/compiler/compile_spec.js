@@ -53,10 +53,10 @@ if (_.inBrowser) {
       expect(typeof linker).toBe('function')
       linker(vm, el)
       expect(vm._bindDir.calls.count()).toBe(4)
-      expect(vm._bindDir).toHaveBeenCalledWith('a', el, descriptorB, defA)
-      expect(vm._bindDir).toHaveBeenCalledWith('a', el.firstChild, descriptorA, defA)
-      expect(vm._bindDir).toHaveBeenCalledWith('b', el.firstChild, descriptorB, defB)
-      expect(vm._bindDir).toHaveBeenCalledWith('b', el.lastChild, descriptorB, defB)
+      expect(vm._bindDir).toHaveBeenCalledWith('a', el, descriptorB, defA, undefined)
+      expect(vm._bindDir).toHaveBeenCalledWith('a', el.firstChild, descriptorA, defA, undefined)
+      expect(vm._bindDir).toHaveBeenCalledWith('b', el.firstChild, descriptorB, defB, undefined)
+      expect(vm._bindDir).toHaveBeenCalledWith('b', el.lastChild, descriptorB, defB, undefined)
       // check the priority sorting
       // the "b" on the firstNode should be called first!
       expect(vm._bindDir.calls.argsFor(1)[0]).toBe('b')
@@ -116,7 +116,7 @@ if (_.inBrowser) {
       // expect 1 call because terminal should return early and let
       // the directive handle the rest.
       expect(vm._bindDir.calls.count()).toBe(1)
-      expect(vm._bindDir).toHaveBeenCalledWith('repeat', el.firstChild, descriptor, def)
+      expect(vm._bindDir).toHaveBeenCalledWith('repeat', el.firstChild, descriptor, def, undefined)
     })
 
     it('custom element components', function () {
@@ -131,7 +131,7 @@ if (_.inBrowser) {
       var linker = compile(el, options)
       linker(vm, el)
       expect(vm._bindDir.calls.count()).toBe(1)
-      expect(vm._bindDir).toHaveBeenCalledWith('component', el.firstChild, descriptor, def)
+      expect(vm._bindDir).toHaveBeenCalledWith('component', el.firstChild, descriptor, def, undefined)
       expect(_.warn).not.toHaveBeenCalled()
     })
 
@@ -204,13 +204,39 @@ if (_.inBrowser) {
       expect(vm._bindDir.calls.count()).toBe(0)
     })
 
-    it('component parent scope compilation should skip v-with & v-component', function () {
-      el.innerHTML = '<div v-component v-with="test"></div>'
-      el = el.firstChild
-      var linker = compile(el, Vue.options, true, true)
-      linker(vm, el)
-      expect(vm._directives.length).toBe(0)
-      expect(el.attributes.length).toBe(2)
+    it('should handle nested transclusions', function (done) {
+      vm = new Vue({
+        el: el,
+        template:
+          '<div v-component="a">' +
+            '<div v-component="b">' +
+              '<div v-repeat="list">{{$value}}</div>' +
+            '</div>' +
+          '</div>',
+        data: {
+          list: [1,2]
+        },
+        components: {
+          a: { template: '<content></content>' },
+          b: { template: '<content></content>' }
+        }
+      })
+      expect(el.innerHTML).toBe(
+        '<div><div>' +
+          '<div>1</div><div>2</div><!--v-repeat-->' +
+        '</div><!--v-component-->' +
+        '</div><!--v-component-->'
+      )
+      vm.list.push(3)
+      _.nextTick(function () {
+        expect(el.innerHTML).toBe(
+          '<div><div>' +
+            '<div>1</div><div>2</div><div>3</div><!--v-repeat-->' +
+          '</div><!--v-component-->' +
+          '</div><!--v-component-->'
+        )
+        done()
+      })
     })
 
   })
