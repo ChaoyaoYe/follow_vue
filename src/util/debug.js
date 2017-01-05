@@ -30,13 +30,13 @@ function enableDebug () {
    * @param {String} msg
    */
 
-  exports.warn = function (msg) {
+  exports.warn = function (msg, e) {
     if (hasConsole && (!config.silent || config.debug)) {
       console.warn('[Vue warn]: ' + msg)
       /* istanbul ignore if */
       if (config.debug) {
         /* jshint debug: true */
-        debugger
+        console.warn((e || new Error('Warning Stack Trace')).stack)
       }
     }
   }
@@ -46,6 +46,23 @@ function enableDebug () {
    */
 
   exports.assertAsset = function (val, type, id) {
+    /* istanbul ignore if */
+    if (type === 'directive') {
+      if (id === 'component') {
+        exports.warn(
+          'v-component has been deprecated in 0.12. ' +
+          'Use custom element syntax instead.'
+        )
+        return
+      }
+      if (id === 'with') {
+        exports.warn(
+          'v-with has been deprecated in 0.12. ' +
+          'Use props instead.'
+        )
+        return
+      }
+    }
     if (!val) {
       exports.warn('Failed to resolve ' + type + ': ' + id)
     }

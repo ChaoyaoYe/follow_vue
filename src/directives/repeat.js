@@ -209,7 +209,9 @@ module.exports = {
     this.vms = this.diff(data, this.vms)
     // update v-ref
     if (this.refID) {
-      this.vm.$[this.refID] = this.vms
+      this.vm.$[this.refID] = this.converted
+        ? toRefObject(this.vms)
+        : this.vms
     }
     if (this.elId) {
       this.vm.$$[this.elId] = this.vms.map(function (vm) {
@@ -235,13 +237,14 @@ module.exports = {
    */
 
   diff: function (data, oldVms) {
+    var activeElement = document.activeElement
     var idKey = this.idKey
     var converted = this.converted
     var anchor = this.anchor
     var alias = this.arg
     var init = !oldVms
     var vms = new Array(data.length)
-    var obj, raw, vm, i, l
+    var obj, raw, vm, i, l, primitive
     // First pass, go through the new Array and fill up
     // the new vms array. If a piece of data has a cached
     // instance for it, we reuse it. Otherwise build a new
@@ -249,14 +252,15 @@ module.exports = {
     for (i = 0, l = data.length; i < l; i++) {
       obj = data[i]
       raw = converted ? obj.$value : obj
-      vm = !init && this.getVm(raw, converted ? obj.$key : null)
+      primitive = !isObject(raw)
+      vm = !init && this.getVm(raw, i, converted ? obj.$key : null)
       if (vm) { // reusable instance
         vm._reused = true
         vm.$index = i // update $index
         // update data for track-by or object repeat,
         // since in these two cases the data is replaced
         // rather than mutated.
-        if (idKey || converted) {
+        if (idKey || converted || primitive) {
           if (alias) {
             vm[alias] = raw
           } else if (_.isPlainObject(raw)) {
@@ -267,10 +271,6 @@ module.exports = {
         }
       } else { // new instance
         vm = this.build(obj, i, true)
-        // the _new flag is used in the second pass for
-        // vm cache retrival, but if this is the init phase
-        // the flag can just be set to false directly.
-        vm._new = !init
         vm._reused = false
       }
       vms[i] = vm
@@ -326,8 +326,10 @@ module.exports = {
           vm.$before(nextEl)
         }
       }
-      vm._new = false
       vm._reused = false
+    }
+    if (activeElement) {
+      activeElement.focus()
     }
     return vms
   },
@@ -370,12 +372,9 @@ module.exports = {
       inherit: this.inherit,
       template: this.inlineTempalte
     }, Ctor)
-    // flag this instance as a repeat instance
-    // so that we can skip it in vm._digest
-    vm._repeat = true
     // cache instance
     if (needCache) {
-      this.cacheVm(raw, vm, this.converted ? meta.$key : null)
+      this.cacheVm(raw, vm, index, this.converted ? meta.$key : null)
     }
     // sync back changes for two-way bindings of primitive values
     var type = typeof raw
@@ -385,6 +384,16 @@ module.exports = {
       (type === 'string' || type === 'number')
     ) {
       vm.$watch(alias || '$value', function (val) {
+        if (dir.filters) {
+          _.warn(
+            'You seem to be mutating the $value reference of ' +
+            'a v-repeat instance (likely through v-model) ' +
+            'and filtering the v-repeat at the same time. ' +
+            'This will not work properly with an Array of ' +
+            'primitive values. Please use an Array of ' +
+            'Objects instead.'
+          )
+        }
         dir._withLock(function () {
           if (dir.converted) {
             dir.rawValue[vm.$key] = val
@@ -427,21 +436,27 @@ module.exports = {
    *
    * @param {Object} data
    * @param {Vue} vm
+   * @param {Number} index
    * @param {String} [key]
    */
 
-  cacheVm: function (data, vm, key) {
+  cacheVm: function (data, vm, index, key) {
     var idKey = this.idKey
     var cache = this.cache
+    var primitive = !isObject(data)
     var id
-    if (key || idKey) {
-      id = idKey ? data[idKey] : key
+    if (key || idKey || primitive) {
+      id = idKey
+        ? idKey === '$index'
+          ? index
+          : data[idKey]
+        : (key || index)
       if (!cache[id]) {
         cache[id] = vm
-      } else {
+      } else if (!primitive && idKey !== '$index') {
         _.warn('Duplicate track-by key in v-repeat: ' + id)
       }
-    } else if (isObject(data)) {
+    } else {
       id = this.id
       if (data.hasOwnProperty(id)) {
         if (data[id] === null) {
@@ -455,12 +470,6 @@ module.exports = {
       } else {
         _.define(data, id, vm)
       }
-    } else {
-      if (!cache[data]) {
-        cache[data] = [vm]
-      } else {
-        cache[data].push(vm)
-      }
     }
     vm._raw = data
   },
@@ -469,30 +478,23 @@ module.exports = {
    * Try to get a cached instance from a piece of data.
    *
    * @param {Object} data
+   * @param {Number} index
    * @param {String} [key]
    * @return {Vue|undefined}
    */
 
-  getVm: function (data, key) {
+  getVm: function (data, index, key) {
     var idKey = this.idKey
-    if (key || idKey) {
-      var id = idKey ? data[idKey] : key
+    var primitive = !isObject(data)
+    if (key || idKey || primitive) {
+      var id = idKey
+        ? idKey === '$index'
+          ? index
+          : data[idKey]
+        : (key || index)
       return this.cache[id]
-    } else if (isObject(data)) {
-      return data[this.id]
     } else {
-      var cached = this.cache[data]
-      if (cached) {
-        var i = 0
-        var vm = cached[i]
-        // since duplicated vm instances might be a reused
-        // one OR a newly created one, we need to return the
-        // first instance that is neither of these.
-        while (vm && (vm._reused || vm._new)) {
-          vm = cached[++i]
-        }
-        return vm
-      }
+      return data[this.id]
     }
   },
 
@@ -505,15 +507,19 @@ module.exports = {
   uncacheVm: function (vm) {
     var data = vm._raw
     var idKey = this.idKey
-    var convertedKey = vm.$key
-    if (idKey || convertedKey) {
-      var id = idKey ? data[idKey] : convertedKey
+    var index = vm.$index
+    var key = vm.$key
+    var primitive = !isObject(data)
+    if (idKey || key || primitive) {
+      var id = idKey
+        ? idKey === '$index'
+          ? index
+          : data[idKey]
+        : (key || index)
       this.cache[id] = null
-    } else if (isObject(data)) {
+    } else {
       data[this.id] = null
       vm._raw = null
-    } else {
-      this.cache[data].pop()
     }
   },
 
@@ -595,4 +601,20 @@ function range (n) {
     ret[i] = i
   }
   return ret
+}
+
+/**
+ * Convert a vms array to an object ref for v-ref on an
+ * Object value.
+ *
+ * @param {Array} vms
+ * @return {Object}
+ */
+
+function toRefObject (vms) {
+  var ref = {}
+  for (var i = 0, l = vms.length; i < l; i++) {
+    ref[vms[i].$key] = vms[i]
+  }
+  return ref
 }

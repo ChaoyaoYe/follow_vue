@@ -44,6 +44,7 @@ describe('Path Parser', function () {
     assertPath('foo["baz"]', ['foo', 'baz'])
     assertPath('foo["b\\"az"]', ['foo', 'b"az'])
     assertPath("foo['b\\'az']", ['foo', "b'az"])
+    assertPath('a[b][c]', ['a', '*b', '*c'])
   })
 
   it('handle invalid paths', function () {
@@ -64,6 +65,7 @@ describe('Path Parser', function () {
     assertInvalidPath('  42   ')
     assertInvalidPath('foo["bar]')
     assertInvalidPath("foo['bar]")
+    assertInvalidPath('foo[bar + boo]')
   })
 
   it('caching', function () {
@@ -81,6 +83,17 @@ describe('Path Parser', function () {
     }
     expect(Path.get(obj, path)).toBe(12345)
     expect(Path.get(obj, 'a.c')).toBeUndefined()
+  })
+
+  it('get dynamic', function () {
+    var path = 'a[b]'
+    var obj = {
+      a: {
+        key: 123
+      },
+      b: 'key'
+    }
+    expect(Path.get(obj, path)).toBe(123)
   })
 
   it('set', function () {
@@ -104,6 +117,16 @@ describe('Path Parser', function () {
     expect(target.a.b.c).toBe(123)
   })
 
+  it('set dynamic non-existent', function () {
+    var target = {
+      key: 'what',
+      obj: {}
+    }
+    var res = Path.set(target, 'obj[key]', 123)
+    expect(res).toBe(true)
+    expect(target.obj.what).toBe(123)
+  })
+
   it('set on prototype chain', function () {
     var parent = { a: {} }
     var target = Object.create(parent)
@@ -111,6 +134,16 @@ describe('Path Parser', function () {
     expect(res).toBe(true)
     expect(target.hasOwnProperty('a')).toBe(false)
     expect(parent.a.b.c).toBe(123)
+  })
+
+  it('set array', function () {
+    var target = {
+      a: []
+    }
+    target.a.$set = jasmine.createSpy('Array.$set')
+    var res = Path.set(target, 'a[1]', 123)
+    expect(res).toBe(true)
+    expect(target.a.$set).toHaveBeenCalledWith('1', 123)
   })
 
   it('set invalid', function () {

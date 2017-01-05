@@ -6,7 +6,6 @@ var transitionEndEvent = _.transitionEndEvent
 var animationEndEvent = _.animationEndEvent
 var transDurationProp = _.transitionProp + 'Duration'
 var animDurationProp = _.animationProp + 'Duration'
-var doc = typeof document === 'undefined' ? null : document
 
 var TYPE_TRANSITION = 1
 var TYPE_ANIMATION = 2
@@ -30,7 +29,7 @@ function Transition (el, id, hooks, vm) {
   // async state
   this.pendingCssEvent =
   this.pendingCssCb =
-  this.jsCancel =
+  this.cancel =
   this.pendingJsCb =
   this.op =
   this.cb = null
@@ -48,6 +47,24 @@ var p = Transition.prototype
 /**
  * Start an entering transition.
  *
+ * 1. enter transition triggered
+ * 2. call beforeEnter hook
+ * 3. add enter class
+ * 4. insert/show element
+ * 5. call enter hook (with possible explicit js callback)
+ * 6. reflow
+ * 7. based on transition type:
+ *    - transition:
+ *        remove class now, wait for transitionend,
+ *        then done if there's no explicit js callback.
+ *    - animation:
+ *        wait for animationend, remove class,
+ *        then done if there's no explicit js callback.
+ *    - no css transition:
+ *        done now if there's no explicit js callback.
+ * 8. wait for either done or js callback, then call
+ *    afterEnter hook.
+ *
  * @param {Function} op - insert/show the element
  * @param {Function} [cb]
  */
@@ -59,6 +76,8 @@ p.enter = function (op, cb) {
   addClass(this.el, this.enterClass)
   op()
   this.callHookWithCb('enter')
+  this.cancel = this.hooks && this.hooks.enterCancelled
+  queue.push(this.enterNextTick)
 }
 
 /**
@@ -76,7 +95,7 @@ p.enterNextTick = function () {
     this.setupCssCb(transitionEndEvent, enterDone)
   } else if (type === TYPE_ANIMATION) {
     this.setupCssCb(animationEndEvent, enterDone)
-  } else {
+  } else if (!this.pendingJsCb) {
     enterDone()
   }
 }
@@ -86,14 +105,28 @@ p.enterNextTick = function () {
  */
 
 p.enterDone = function () {
-  this.jsCancel = this.pendingJsCb = null
+  this.cancel = this.pendingJsCb = null
   removeClass(this.el, this.enterClass)
-  this.callHook('enterDone')
+  this.callHook('afterEnter')
   if (this.cb) this.cb()
 }
 
 /**
  * Start a leaving transition.
+ *
+ * 1. leave transition triggered.
+ * 2. call beforeLeave hook
+ * 3. add leave class (trigger css transition)
+ * 4. call leave hook (with possible explicit js callback)
+ * 5. reflow if no explicit js callback is provided
+ * 6. based on transition type:
+ *    - transition or animation:
+ *        wait for end event, remove class, then done if
+ *        there's no explicit js callback.
+ *    - no css transition: 
+ *        done if there's no explicit js callback.
+ * 7. wait for either done or js callback, then call
+ *    afterLeave hook.
  *
  * @param {Function} op - remove/hide the element
  * @param {Function} [cb]
@@ -106,6 +139,12 @@ p.leave = function (op, cb) {
   this.cb = cb
   addClass(this.el, this.leaveClass)
   this.callHookWithCb('leave')
+  this.cancel = this.hooks && this.hooks.enterCancelled
+  // only need to do leaveNextTick if there's no explicit
+  // js callback
+  if (!this.pendingJsCb) {
+    queue.push(this.leaveNextTick)
+  }
 }
 
 /**
@@ -129,9 +168,10 @@ p.leaveNextTick = function () {
  */
 
 p.leaveDone = function () {
+  this.cancel = this.pendingJsCb = null
   this.op()
   removeClass(this.el, this.leaveClass)
-  this.callHook('leaveDone')
+  this.callHook('afterLeave')
   if (this.cb) this.cb()
 }
 
@@ -157,9 +197,9 @@ p.cancelPending = function () {
     removeClass(this.el, this.enterClass)
     removeClass(this.el, this.leaveClass)
   }
-  if (this.jsCancel) {
-    this.jsCancel.call(null)
-    this.jsCancel = null
+  if (this.cancel) {
+    this.cancel.call(this.vm, this.el)
+    this.cancel = null
   }
 }
 
@@ -192,11 +232,7 @@ p.callHookWithCb = function (type) {
     if (hook.length > 1) {
       this.pendingJsCb = _.cancellable(this[type + 'Done'])
     }
-    this.jsCancel = hook.call(this.vm, this.el, this.pendingJsCb)
-  }
-  // only need to handle nextTick stuff if no js cb is provided
-  if (!this.pendingJsCb) {
-    queue.push(this[type + 'NextTick'])
+    hook.call(this.vm, this.el, this.pendingJsCb)
   }
 }
 
@@ -214,7 +250,8 @@ p.getCssTransitionType = function (className) {
   // firing until the page is visible again.
   // pageVisibility API is supported in IE10+, same as
   // CSS transitions.
-  if (!transitionEndEvent || (doc && doc.hidden)) {
+  /* istanbul ignore if */
+  if (!transitionEndEvent || document.hidden) {
     return
   }
   var type = this.typeCache[className]
