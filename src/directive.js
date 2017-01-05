@@ -31,7 +31,7 @@ function Directive (name, el, vm, descriptor, def, host) {
   this.raw = descriptor.raw
   this.expression = descriptor.expression
   this.arg = descriptor.arg
-  this.filters = _.resolveFilters(vm, descriptor.filters)
+  this.filters = descriptor.filters
   // private
   this._descriptor = descriptor
   this._host = host
@@ -78,27 +78,22 @@ p._bind = function (def) {
           }
         }
       : function () {} // noop if no update is provided
-    // use raw expression as identifier because filters
-    // make them different watchers
-    var watcher = this.vm._watchers[this.raw]
-    // v-repeat always creates a new watcher because it has
-    // a special filter that's bound to its directive
-    // instance.
-    if (!watcher || this.name === 'repeat') {
-      watcher = this.vm._watchers[this.raw] = new Watcher(
-        this.vm,
-        this._watcherExp,
-        update, // callback
-        {
-          filters: this.filters,
-          twoWay: this.twoWay,
-          deep: this.deep
-        }
-      )
-    } else {
-      watcher.addCb(update)
-    }
-    this._watcher = watcher
+    // pre-process hook called before the value is piped
+    // through the filters. used in v-repeat.
+    var preProcess = this._preProcess
+      ? _.bind(this._preProcess, this)
+      : null
+    var watcher = this._watcher = new Watcher(
+      this.vm,
+      this._watcherExp,
+      update, // callback
+      {
+        filters: this.filters,
+        twoWay: this.twoWay,
+        deep: this.deep,
+        preProcess: preProcess
+      }
+    )
     if (this._initValue != null) {
       watcher.set(this._initValue)
     } else if (this.update) {
@@ -150,11 +145,7 @@ p._checkStatement = function () {
       fn.call(vm, vm)
     }
     if (this.filters) {
-      handler = _.applyFilters(
-        handler,
-        this.filters.read,
-        vm
-      )
+      handler = vm._applyFilters(handler, null, this.filters)
     }
     this.update(handler)
     return true
@@ -182,17 +173,13 @@ p._checkParam = function (name) {
 
 p._teardown = function () {
   if (this._bound) {
+    this._bound = false
     if (this.unbind) {
       this.unbind()
     }
-    var watcher = this._watcher
-    if (watcher && watcher.active) {
-      watcher.removeCb(this._update)
-      if (!watcher.active) {
-        this.vm._watchers[this.raw] = null
-      }
+    if (this._watcher) {
+      this._watcher.teardown()
     }
-    this._bound = false
     this.vm = this.el = this._watcher = null
   }
 }
@@ -203,23 +190,31 @@ p._teardown = function () {
  * e.g. v-model.
  *
  * @param {*} value
- * @param {Boolean} lock - prevent wrtie triggering update.
  * @public
  */
 
-p.set = function (value, lock) {
+p.set = function (value) {
   if (this.twoWay) {
-    if (lock) {
-      this._locked = true
-    }
-    this._watcher.set(value)
-    if (lock) {
-      var self = this
-      _.nextTick(function () {
-        self._locked = false
-      })
-    }
+    this._withLock(function () {
+      this._watcher.set(value)
+    })
   }
+}
+
+/**
+ * Execute a function while preventing that function from
+ * triggering updates on this directive instance.
+ *
+ * @param {Function} fn
+ */
+
+p._withLock = function (fn) {
+  var self = this
+  self._locked = true
+  fn.call(self)
+  _.nextTick(function () {
+    self._locked = false
+  })
 }
 
 module.exports = Directive

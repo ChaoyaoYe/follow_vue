@@ -136,16 +136,9 @@ describe('Directive', function () {
     d.set(2)
     expect(vm.a).toBe(6)
     nextTick(function () {
-      expect(def.update.calls.count()).toBe(2)
-      expect(def.update).toHaveBeenCalledWith(6, 1)
-      // locked set
-      d.set(3, true)
-      expect(vm.a).toBe(9)
-      nextTick(function () {
-        // should have no update calls
-        expect(def.update.calls.count()).toBe(2)
-        done()
-      })
+      // should have no update calls
+      expect(def.update.calls.count()).toBe(1)
+      done()
     })
   })
 
@@ -167,27 +160,6 @@ describe('Directive', function () {
     }, def.update)
     expect(d.update).toBe(def.update)
     expect(def.update).toHaveBeenCalled()
-  })
-
-  it('reuse the same watcher', function (done) {
-    var d = new Directive('test', el, vm, {
-      expression: 'a',
-    }, def)
-    var d2 = new Directive('test', el, vm, {
-      expression: 'a',
-    }, def)
-    expect(vm._watcherList.length).toBe(1)
-    expect(d._watcher).toBe(d2._watcher)
-    d2._teardown()
-    expect(d2._watcher).toBeNull()
-    expect(vm._watcherList.length).toBe(1)
-    vm.a = 2
-    nextTick(function () {
-      expect(def.update).toHaveBeenCalledWith(2, 1)
-      d._teardown()
-      expect(vm._watcherList.length).toBe(0)
-      done()
-    })
   })
 
 })

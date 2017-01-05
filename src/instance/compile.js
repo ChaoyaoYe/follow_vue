@@ -51,6 +51,10 @@ exports._initElement = function (el) {
     this._isBlock = true
     this.$el = this._blockStart = el.firstChild
     this._blockEnd = el.lastChild
+    // set persisted text anchors to empty
+    if (this._blockStart.nodeType === 3) {
+      this._blockStart.data = this._blockEnd.data = ''
+    }
     this._blockFragment = el
   } else {
     this.$el = el
@@ -114,13 +118,9 @@ exports._destroy = function (remove, deferCleanup) {
     // splicing the directives
     this._unlinkFn(true)
   }
-  // teardown all user watchers.
-  var watcher
-  for (i in this._userWatchers) {
-    watcher = this._userWatchers[i]
-    if (watcher) {
-      watcher.teardown()
-    }
+  i = this._watchers.length
+  while (i--) {
+    this._watchers[i].teardown()
   }
   // remove reference to self on $el
   if (this.$el) {
@@ -148,8 +148,6 @@ exports._cleanup = function () {
   this._data.__ob__.removeVm(this)
   this._data =
   this._watchers =
-  this._userWatchers =
-  this._watcherList =
   this.$el =
   this.$parent =
   this.$root =

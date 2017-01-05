@@ -120,7 +120,7 @@ if (_.inBrowser) {
       })
       var markup = vm.items.map(function (item, i) {
         return '<div>' + i + ' ' + item.toString() + '</div>'
-      }).join('') + '<!--v-repeat-->'
+      }).join('')
       expect(el.innerHTML).toBe(markup)
     })
 
@@ -135,7 +135,7 @@ if (_.inBrowser) {
         },
         template: '<div v-repeat="items | filterBy \'aaa\'">{{msg}}</div>'
       })
-      expect(el.innerHTML).toBe('<div>aaa</div><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<div>aaa</div>')
     })
 
     it('component', function (done) {
@@ -223,9 +223,8 @@ if (_.inBrowser) {
           '</div>'
       })
       expect(el.innerHTML).toBe(
-        '<div><p>0 1 0 1</p><p>1 2 0 1</p><!--v-repeat--></div>' +
-        '<div><p>0 3 1 2</p><p>1 4 1 2</p><!--v-repeat--></div>' +
-        '<!--v-repeat-->'
+        '<div><p>0 1 0 1</p><p>1 2 0 1</p></div>' +
+        '<div><p>0 3 1 2</p><p>1 4 1 2</p></div>'
       )
     })
 
@@ -244,9 +243,8 @@ if (_.inBrowser) {
       })
       function output(key){
         var key1 = key === 'listA' ? 'listB' : 'listA'
-        return  '<div>'+ key +'<p>1</p><p>2</p><!--v-repeat--></div>' +
-                '<div>'+ key1 +'<p>1</p><p>2</p><!--v-repeat--></div>' +
-                '<!--v-repeat-->'
+        return  '<div>'+ key +'<p>1</p><p>2</p></div>' +
+                '<div>'+ key1 +'<p>1</p><p>2</p></div>'
       }
       expect(el.innerHTML === output('listA') || el.innerHTML === output('listB')).toBeTruthy()
     })
@@ -254,7 +252,7 @@ if (_.inBrowser) {
     it('dynamic component type based on instance data', function () {
       var vm = new Vue({
         el: el,
-        template: '<component v-repeat="list" type="view-{{type}}"></component>',
+        template: '<component v-repeat="list" is="view-{{type}}"></component>',
         data: {
           list: [
             { type: 'a' },
@@ -274,11 +272,11 @@ if (_.inBrowser) {
           }
         }
       })
-      expect(el.innerHTML).toBe('<component>AAA</component><component>BBB</component><component>CCC</component><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<component>AAA</component><component>BBB</component><component>CCC</component>')
       // #458 meta properties
       vm = new Vue({
         el: el,
-        template: '<component v-repeat="list" type="view-{{$value}}"></component>',
+        template: '<component v-repeat="list" is="view-{{$value}}"></component>',
         data: {
           list: ['a', 'b', 'c']
         },
@@ -294,7 +292,7 @@ if (_.inBrowser) {
           }
         }
       })
-      expect(el.innerHTML).toBe('<component>AAA</component><component>BBB</component><component>CCC</component><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<component>AAA</component><component>BBB</component><component>CCC</component>')
     })
 
     it('block repeat', function (done) {
@@ -318,9 +316,9 @@ if (_.inBrowser) {
 
       function assertMarkup () {
         var markup = vm.list.map(function (item) {
-          return '<!--v-start--><p>' + item.a + '</p><p>' + (item.a + 1) + '</p><!--v-end-->'
+          return '<p>' + item.a + '</p><p>' + (item.a + 1) + '</p>'
         }).join('')
-        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+        expect(el.innerHTML).toBe(markup)
       }
     })
 
@@ -343,13 +341,13 @@ if (_.inBrowser) {
       var markup = vm.list.map(function (item) {
         return '<div class="child parent">' + item.a + ' hi</div>'
       }).join('')
-      expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+      expect(el.innerHTML).toBe(markup)
       vm.msg = 'ho'
       markup = vm.list.map(function (item) {
         return '<div class="child parent">' + item.a + ' ho</div>'
       }).join('')
       _.nextTick(function () {
-        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+        expect(el.innerHTML).toBe(markup)
         done()
       })
     })
@@ -412,7 +410,7 @@ if (_.inBrowser) {
           .map(function (item) {
             return '<div>' + item.id + '</div>'
           }).join('')
-        expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+        expect(el.innerHTML).toBe(markup)
       }
     })
 
@@ -429,10 +427,10 @@ if (_.inBrowser) {
           }
         }
       })
-      expect(el.innerHTML).toBe('<div>3</div><div>2</div><div>1</div><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<div>3</div><div>2</div><div>1</div>')
       vm.sortKey = '$value'
       _.nextTick(function () {
-        expect(el.innerHTML).toBe('<div>1</div><div>2</div><div>3</div><!--v-repeat-->')
+        expect(el.innerHTML).toBe('<div>1</div><div>2</div><div>3</div>')
         done()
       })
     })
@@ -445,7 +443,7 @@ if (_.inBrowser) {
           list: [3, 2, 1]
         }
       })
-      expect(el.innerHTML).toBe('<div>1</div><div>2</div><div>3</div><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<div>1</div><div>2</div><div>3</div>')
     })
 
     it('track by id', function (done) {
@@ -493,7 +491,7 @@ if (_.inBrowser) {
           var markup = vm.list.map(function (item) {
             return '<test>' + item.msg + '</test>'
           }).join('')
-          expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+          expect(el.innerHTML).toBe(markup)
         }
       }
     })
@@ -543,7 +541,7 @@ if (_.inBrowser) {
         el: el,
         template: '<div v-repeat="3">{{$index}} {{$value}}</div>'
       })
-      expect(el.innerHTML).toBe('<div>0 0</div><div>1 1</div><div>2 2</div><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<div>0 0</div><div>1 1</div><div>2 2</div>')
     })
 
     it('repeat string', function () {
@@ -551,7 +549,7 @@ if (_.inBrowser) {
         el: el,
         template: '<div v-repeat="\'vue\'">{{$index}} {{$value}}</div>'
       })
-      expect(el.innerHTML).toBe('<div>0 v</div><div>1 u</div><div>2 e</div><!--v-repeat-->')
+      expect(el.innerHTML).toBe('<div>0 v</div><div>1 u</div><div>2 e</div>')
     })
 
     it('teardown', function () {
@@ -580,17 +578,21 @@ if (_.inBrowser) {
         transitions: {
           test: {
             leave: function (el, done) {
-              setTimeout(done, 1)
+              setTimeout(done, 0)
             }
           }
         }
       })
       vm.items.splice(1, 1, {a:4})
       setTimeout(function () {
-        expect(el.innerHTML).toBe('<div>1</div><div>4</div><div>3</div><!--v-repeat-->')
+        expect(el.innerHTML).toBe(
+          '<div class="test-transition">1</div>' +
+          '<div class="test-transition">4</div>' +
+          '<div class="test-transition">3</div>'
+        )
         document.body.removeChild(el)
         done()
-      }, 30)
+      }, 100)
     })
 
     it('sync $value changes back to original array/object', function (done) {
@@ -616,7 +618,7 @@ if (_.inBrowser) {
 
     it('nested track by', function (done) {
       assertTrackBy('<div v-repeat="list" track-by="id">{{msg}}<div v-repeat="list" track-by="id">{{msg}}</div></div>', function () {
-        assertTrackBy('<div v-transition v-repeat="list" track-by="id">{{msg}}<div v-transition v-repeat="list" track-by="id">{{msg}}</div></div>', done)
+        assertTrackBy('<div v-repeat="list" track-by="id">{{msg}}<div v-repeat="list" track-by="id">{{msg}}</div></div>', done)
       })
 
       function assertTrackBy(template, next) {
@@ -660,12 +662,38 @@ if (_.inBrowser) {
           var markup = vm.list.map(function (item) {
             var sublist = item.list.map(function (item) {
               return '<div>' + item.msg + '</div>'
-            }).join('') + '<!--v-repeat-->'
+            }).join('')
             return '<div>' + item.msg + sublist + '</div>'
-          }).join('') + '<!--v-repeat-->'
+          }).join('')
           expect(el.innerHTML).toBe(markup)
         }
       }
+    })
+
+    it('switch between object-converted & array mode', function (done) {
+      var obj = {
+        a: { msg: 'AA' },
+        b: { msg: 'BB' }
+      }
+      var arr = [obj.b, obj.a]
+      var vm = new Vue({
+        el: el,
+        template: '<div v-repeat="obj">{{msg}}</div>',
+        data: {
+          obj: obj
+        }
+      })
+      expect(el.innerHTML).toBe(Object.keys(obj).map(function (key) {
+        return '<div>' + obj[key].msg + '</div>'
+      }).join(''))
+      vm.obj = arr
+      _.nextTick(function () {
+        expect(el.innerHTML).toBe('<div>BB</div><div>AA</div>')
+        // make sure it cleared the cache
+        expect(vm._directives[0].cache.a).toBeNull()
+        expect(vm._directives[0].cache.b).toBeNull()
+        done()
+      })
     })
 
   })
@@ -703,7 +731,7 @@ function go (fn, cb) {
  * an Array of Objects
  */
 
-function assertMutations (vm, el, done, isBlock) {
+function assertMutations (vm, el, done) {
   assertMarkup()
   var poppedItem
   go(
@@ -763,10 +791,9 @@ function assertMutations (vm, el, done, isBlock) {
     var tag = el.children[0].tagName.toLowerCase()
     var markup = vm.items.map(function (item, i) {
       var el = '<' + tag + '>' + i + ' ' + item.a + '</' + tag + '>'
-      if (isBlock) el = '<!--v-start-->' + el + '<!--v-end-->'
       return el
     }).join('')
-    expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+    expect(el.innerHTML).toBe(markup)
   }
 }
 
@@ -835,7 +862,7 @@ function assertPrimitiveMutations (vm, el, done) {
     var markup = vm.items.map(function (item, i) {
       return '<div>' + i + ' ' + item + '</div>'
     }).join('')
-    expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+    expect(el.innerHTML).toBe(markup)
   }
 }
 
@@ -873,7 +900,7 @@ function assertObjectMutations (vm, el, done) {
     var markup = Object.keys(vm.items).map(function (key, i) {
       return '<div>' + i + ' ' + key + ' ' + vm.items[key].a + '</div>'
     }).join('')
-    expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+    expect(el.innerHTML).toBe(markup)
   }
 }
 
@@ -911,6 +938,6 @@ function assertObjectPrimitiveMutations (vm, el, done) {
     var markup = Object.keys(vm.items).map(function (key, i) {
       return '<div>' + i + ' ' + key + ' ' + vm.items[key] + '</div>'
     }).join('')
-    expect(el.innerHTML).toBe(markup + '<!--v-repeat-->')
+    expect(el.innerHTML).toBe(markup)
   }
 }

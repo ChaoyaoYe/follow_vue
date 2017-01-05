@@ -3,6 +3,7 @@ var Cache = require('../cache')
 var cache = new Cache(1000)
 var argRE = /^[^\{\?]+$|^'[^']*'$|^"[^"]*"$/
 var filterTokenRE = /[^\s'"]+|'[^']+'|"[^"]+"/g
+var reservedArgRE = /^in$|^-?\d+/
 
 /**
  * Parser state
@@ -49,12 +50,31 @@ function pushFilter () {
     filter = {}
     var tokens = exp.match(filterTokenRE)
     filter.name = tokens[0]
-    filter.args = tokens.length > 1 ? tokens.slice(1) : null
+    if (tokens.length > 1) {
+      filter.args = tokens.slice(1).map(processFilterArg)
+    }
   }
   if (filter) {
     (dir.filters = dir.filters || []).push(filter)
   }
   lastFilterIndex = i + 1
+}
+
+/**
+ * Check if an argument is dynamic and strip quotes.
+ *
+ * @param {String} arg
+ * @return {Object}
+ */
+
+function processFilterArg (arg) {
+  var stripped = reservedArgRE.test(arg)
+    ? arg
+    : _.stripQuotes(arg)
+  return {
+    value: stripped || arg,
+    dynamic: !stripped
+  }
 }
 
 /**

@@ -18,8 +18,8 @@ module.exports = {
   bind: function () {
     if (!this.el.__vue__) {
       // create a ref anchor
-      this.ref = document.createComment('v-component')
-      _.replace(this.el, this.ref)
+      this.anchor = _.createAnchor('v-component')
+      _.replace(this.el, this.anchor)
       // check keep-alive options.
       // If yes, instead of destroying the active vm when
       // hiding (v-if) or switching (dynamic literal) it,
@@ -44,7 +44,7 @@ module.exports = {
       if (!this._isDynamicLiteral) {
         this.resolveCtor(this.expression, _.bind(function () {
           var child = this.build()
-          child.$before(this.ref)
+          child.$before(this.anchor)
           this.setCurrent(child)
         }, this))
       } else {
@@ -57,6 +57,49 @@ module.exports = {
         'v-component="' + this.expression + '" cannot be ' +
         'used on an already mounted instance.'
       )
+    }
+  },
+
+  /**
+   * Public update, called by the watcher in the dynamic
+   * literal scenario, e.g. v-component="{{view}}"
+   */
+
+  update: function (value) {
+    this.realUpdate(value)
+  },
+
+  /**
+   * Switch dynamic components. May resolve the component
+   * asynchronously, and perform transition based on
+   * specified transition mode. Accepts an async callback
+   * which is called when the transition ends. (This is
+   * exposed for vue-router)
+   *
+   * @param {String} value
+   * @param {Function} [cb]
+   */
+
+  realUpdate: function (value, cb) {
+    this.invalidatePending()
+    if (!value) {
+      // just remove current
+      this.unbuild()
+      this.remove(this.childVM, cb)
+      this.unsetCurrent()
+    } else {
+      this.resolveCtor(value, _.bind(function () {
+        this.unbuild()
+        var newComponent = this.build()
+        var self = this
+        if (this.readyEvent) {
+          newComponent.$once(this.readyEvent, function () {
+            self.swapTo(newComponent, cb)
+          })
+        } else {
+          this.swapTo(newComponent, cb)
+        }
+      }, this))
     }
   },
 
@@ -157,58 +200,32 @@ module.exports = {
   },
 
   /**
-   * Update callback for the dynamic literal scenario,
-   * e.g. v-component="{{view}}"
-   */
-
-  update: function (value) {
-    this.invalidatePending()
-    if (!value) {
-      // just remove current
-      this.remove(this.childVM)
-      this.unsetCurrent()
-    } else {
-      this.resolveCtor(value, _.bind(function () {
-        this.unbuild()
-        var newComponent = this.build()
-        var self = this
-        if (this.readyEvent) {
-          newComponent.$once(this.readyEvent, function () {
-            self.swapTo(newComponent)
-          })
-        } else {
-          this.swapTo(newComponent)
-        }
-      }, this))
-    }
-  },
-
-  /**
    * Actually swap the components, depending on the
    * transition mode. Defaults to simultaneous.
    *
    * @param {Vue} target
+   * @param {Function} [cb]
    */
 
-  swapTo: function (target) {
+  swapTo: function (target, cb) {
     var self = this
     var current = this.childVM
     this.unsetCurrent()
     this.setCurrent(target)
     switch (self.transMode) {
       case 'in-out':
-        target.$before(self.ref, function () {
-          self.remove(current)
+        target.$before(self.anchor, function () {
+          self.remove(current, cb)
         })
         break
       case 'out-in':
         self.remove(current, function () {
-          target.$before(self.ref)
+          target.$before(self.anchor, cb)
         })
         break
       default:
         self.remove(current)
-        target.$before(self.ref)
+        target.$before(self.anchor, cb)
     }
   },
 

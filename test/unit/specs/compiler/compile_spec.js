@@ -1,7 +1,6 @@
 var Vue = require('../../../../src/vue')
 var _ = require('../../../../src/util')
 var dirParser = require('../../../../src/parsers/directive')
-var merge = require('../../../../src/util/merge-option')
 var compile = require('../../../../src/compiler/compile')
 var transclude = require('../../../../src/compiler/transclude')
 
@@ -50,7 +49,7 @@ if (_.inBrowser) {
       var defB = { priority: 2 }
       var descriptorA = dirParser.parse('a')[0]
       var descriptorB = dirParser.parse('b')[0]
-      var options = merge(Vue.options, {
+      var options = _.mergeOptions(Vue.options, {
         directives: {
           a: defA,
           b: defB
@@ -120,7 +119,7 @@ if (_.inBrowser) {
     })
 
     it('custom element components', function () {
-      var options = merge(Vue.options, {
+      var options = _.mergeOptions(Vue.options, {
         components: {
           'my-component': {}
         }
@@ -146,7 +145,7 @@ if (_.inBrowser) {
     })
 
     it('props', function () {
-      var options = merge(Vue.options, {
+      var options = _.mergeOptions(Vue.options, {
         _asComponent: true,
         props: [
           'a',
@@ -197,7 +196,7 @@ if (_.inBrowser) {
       expect(args[0]).toBe('prop')
       expect(args[1]).toBe(null)
       expect(args[2].arg).toBe('withFilter')
-      expect(args[2].expression).toBe('this._applyFilter("filter",[a])')
+      expect(args[2].expression).toBe('this._applyFilters(a,null,[{"name":"filter"}],false)')
       expect(args[3]).toBe(def)
       // camelCase should've warn
       expect(_.warn.calls.count()).toBe(1)
@@ -257,17 +256,15 @@ if (_.inBrowser) {
       })
       expect(el.innerHTML).toBe(
         '<testa><testb>' +
-          '<div>1</div><div>2</div><!--v-repeat-->' +
-        '</testb><!--v-component-->' +
-        '</testa><!--v-component-->'
+          '<div>1</div><div>2</div>' +
+        '</testb></testa>'
       )
       vm.list.push(3)
       _.nextTick(function () {
         expect(el.innerHTML).toBe(
           '<testa><testb>' +
-            '<div>1</div><div>2</div><div>3</div><!--v-repeat-->' +
-          '</testb><!--v-component-->' +
-          '</testa><!--v-component-->'
+            '<div>1</div><div>2</div><div>3</div>' +
+          '</testb></testa>'
         )
         done()
       })

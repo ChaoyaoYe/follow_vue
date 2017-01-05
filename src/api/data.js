@@ -1,4 +1,3 @@
-var _ = require('../util')
 var Watcher = require('../watcher')
 var Path = require('../parsers/path')
 var textParser = require('../parsers/text')
@@ -70,28 +69,18 @@ exports.$delete = function (key) {
 
 exports.$watch = function (exp, cb, deep, immediate) {
   var vm = this
-  var key = deep ? exp + '**deep**' : exp
-  var watcher = vm._userWatchers[key]
   var wrappedCb = function (val, oldVal) {
     cb.call(vm, val, oldVal)
   }
-  if (!watcher) {
-    watcher = vm._userWatchers[key] =
-      new Watcher(vm, exp, wrappedCb, {
-        deep: deep,
-        user: true
-      })
-  } else {
-    watcher.addCb(wrappedCb)
-  }
+  var watcher = new Watcher(vm, exp, wrappedCb, {
+    deep: deep,
+    user: true
+  })
   if (immediate) {
     wrappedCb(watcher.value)
   }
   return function unwatchFn () {
-    watcher.removeCb(wrappedCb)
-    if (!watcher.active) {
-      vm._userWatchers[key] = null
-    }
+    watcher.teardown()
   }
 }
 
@@ -109,13 +98,10 @@ exports.$eval = function (text) {
     // the filter regex check might give false positive
     // for pipes inside strings, so it's possible that
     // we don't get any filters here
+    var val = this.$get(dir.expression)
     return dir.filters
-      ? _.applyFilters(
-          this.$get(dir.expression),
-          _.resolveFilters(this, dir.filters).read,
-          this
-        )
-      : this.$get(dir.expression)
+      ? this._applyFilters(val, null, dir.filters)
+      : val
   } else {
     // no filter
     return this.$get(text)

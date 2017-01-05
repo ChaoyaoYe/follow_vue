@@ -17,7 +17,8 @@ describe('Watcher', function () {
           c: 2,
           d: 4
         },
-        c: 'c'
+        c: 'c',
+        msg: 'yo'
       }
     })
     spy = jasmine.createSpy('watcher')
@@ -235,12 +236,11 @@ describe('Watcher', function () {
     vm.$options.filters.test2 = function (val, str) {
       return val + str
     }
-    var filters = _.resolveFilters(vm, [
-      { name: 'test', args: [3] },
-      { name: 'test2', args: ['yo']}
-    ])
     var watcher = new Watcher(vm, 'b.c', spy, {
-      filters: filters
+      filters: [
+        { name: 'test', args: [{value:3, dynamic:false}]},
+        { name: 'test2', args: [{value:'msg', dynamic:true}]}
+      ]
     })
     expect(watcher.value).toBe('6yo')
     vm.b.c = 3
@@ -257,11 +257,10 @@ describe('Watcher', function () {
         return val > arg ? val : oldVal
       }
     }
-    var filters = _.resolveFilters(vm, [
-      { name: 'test', args: [5] }
-    ])
     var watcher = new Watcher(vm, 'b["c"]', spy, {
-      filters: filters,
+      filters: [
+        { name: 'test', args: [{value:5, dynamic:false}] }
+      ],
       twoWay: true
     })
     expect(watcher.value).toBe(2)
@@ -314,39 +313,6 @@ describe('Watcher', function () {
     })
   })
 
-  it('add callback', function (done) {
-    var watcher = new Watcher(vm, 'a', spy)
-    var spy2 = jasmine.createSpy()
-    watcher.addCb(spy2)
-    vm.a = 99
-    nextTick(function () {
-      expect(spy).toHaveBeenCalledWith(99, 1)
-      expect(spy2).toHaveBeenCalledWith(99, 1)
-      done()
-    })
-  })
-
-  it('remove callback', function (done) {
-    // single, should equal teardown
-    var fn = function () {}
-    var watcher = new Watcher(vm, 'a', fn)
-    watcher.removeCb(fn)
-    expect(watcher.active).toBe(false)
-    expect(watcher.vm).toBe(null)
-    expect(watcher.cbs).toBe(null)
-    // multiple
-    watcher = new Watcher(vm, 'a', spy)
-    var spy2 = jasmine.createSpy()
-    watcher.addCb(spy2)
-    watcher.removeCb(spy)
-    vm.a = 234
-    nextTick(function () {
-      expect(spy).not.toHaveBeenCalled()
-      expect(spy2).toHaveBeenCalledWith(234, 1)
-      done()
-    })
-  })
-
   it('teardown', function (done) {
     var watcher = new Watcher(vm, 'b.c', spy)
     watcher.teardown()
@@ -354,7 +320,7 @@ describe('Watcher', function () {
     nextTick(function () {
       expect(watcher.active).toBe(false)
       expect(watcher.vm).toBe(null)
-      expect(watcher.cbs).toBe(null)
+      expect(watcher.cb).toBe(null)
       expect(spy).not.toHaveBeenCalled()
       done()
     })
@@ -369,21 +335,6 @@ describe('Watcher', function () {
     expect(spy).toHaveBeenCalledWith(2, 1)
     expect(spy).toHaveBeenCalledWith(3, 2)
     config.async = true
-  })
-
-  it('handle a cb that triggers removeCb', function () {
-    var watcher = new Watcher(vm, 'a', spy)
-    watcher.addCb(function () {
-      watcher.removeCb(spy)
-    })
-    watcher.addCb(function () {})
-    config.async = false
-    expect(function () {
-      vm.a = 2
-    }).not.toThrow()
-    config.async = true
-    expect(spy).toHaveBeenCalled()
-    expect(watcher.cbs.length).toBe(2)
   })
 
   it('warn getter errors', function () {

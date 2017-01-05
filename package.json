@@ -1,6 +1,6 @@
 {
   "name": "vue",
-  "version": "0.12.0-beta2",
+  "version": "0.12.0-beta4",
   "author": "Evan You <yyx990803@gmail.com>",
   "license": "MIT",
   "description": "Simple, Fast & Composable MVVM for building interative interfaces",
@@ -21,6 +21,7 @@
     "dev": "webpack --watch --config build/webpack-dev-config.js & webpack --watch --config build/webpack-test-config.js"
   },
   "devDependencies": {
+    "casperjs": "^1.1.0-beta3",
     "grunt": "^0.4.5",
     "grunt-contrib-jshint": "^0.10.0",
     "grunt-karma": "^0.8.3",

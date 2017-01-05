@@ -18,29 +18,25 @@ var uid = 0
  *                 - {Boolean} twoWay
  *                 - {Boolean} deep
  *                 - {Boolean} user
+ *                 - {Function} [preProcess]
  * @constructor
  */
 
 function Watcher (vm, expression, cb, options) {
   this.vm = vm
-  vm._watcherList.push(this)
+  vm._watchers.push(this)
   this.expression = expression
-  this.cbs = [cb]
+  this.cb = cb
   this.id = ++uid // uid for batching
   this.active = true
   options = options || {}
   this.deep = !!options.deep
   this.user = !!options.user
+  this.twoWay = !!options.twoWay
+  this.filters = options.filters
+  this.preProcess = options.preProcess
   this.deps = []
   this.newDeps = []
-  // setup filters if any.
-  // We delegate directive filters here to the watcher
-  // because they need to be included in the dependency
-  // collection process.
-  if (options.filters) {
-    this.readFilters = options.filters.read
-    this.writeFilters = options.filters.write
-  }
   // parse expression for getter/setter
   var res = expParser.parse(expression, options.twoWay)
   this.getter = res.get
@@ -93,7 +89,12 @@ p.get = function () {
   if (this.deep) {
     traverse(value)
   }
-  value = _.applyFilters(value, this.readFilters, vm)
+  if (this.preProcess) {
+    value = this.preProcess(value)
+  }
+  if (this.filters) {
+    value = vm._applyFilters(value, null, this.filters, false)
+  }
   this.afterGet()
   return value
 }
@@ -106,9 +107,10 @@ p.get = function () {
 
 p.set = function (value) {
   var vm = this.vm
-  value = _.applyFilters(
-    value, this.writeFilters, vm, this.value
-  )
+  if (this.filters) {
+    value = vm._applyFilters(
+      value, this.value, this.filters, true)
+  }
   try {
     this.setter.call(vm, vm, value)
   } catch (e) {
@@ -174,43 +176,8 @@ p.run = function () {
     ) {
       var oldValue = this.value
       this.value = value
-      var cbs = this.cbs
-      for (var i = 0, l = cbs.length; i < l; i++) {
-        cbs[i](value, oldValue)
-        // if a callback also removed other callbacks,
-        // we need to adjust the loop accordingly.
-        var removed = l - cbs.length
-        if (removed) {
-          i -= removed
-          l -= removed
-        }
-      }
+      this.cb(value, oldValue)
     }
-  }
-}
-
-/**
- * Add a callback.
- *
- * @param {Function} cb
- */
-
-p.addCb = function (cb) {
-  this.cbs.push(cb)
-}
-
-/**
- * Remove a callback.
- *
- * @param {Function} cb
- */
-
-p.removeCb = function (cb) {
-  var cbs = this.cbs
-  if (cbs.length > 1) {
-    cbs.$remove(cb)
-  } else if (cb === cbs[0]) {
-    this.teardown()
   }
 }
 
@@ -224,14 +191,14 @@ p.teardown = function () {
     // we can skip this if the vm if being destroyed
     // which can improve teardown performance.
     if (!this.vm._isBeingDestroyed) {
-      this.vm._watcherList.$remove(this)
+      this.vm._watchers.$remove(this)
     }
     var i = this.deps.length
     while (i--) {
       this.deps[i].removeSub(this)
     }
     this.active = false
-    this.vm = this.cbs = this.value = null
+    this.vm = this.cb = this.value = null
   }
 }
 
