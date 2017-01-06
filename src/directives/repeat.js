@@ -24,7 +24,7 @@ module.exports = {
     this.id = '__v_repeat_' + (++uid)
     // setup anchor nodes
     this.start = _.createAnchor('v-repeat-start')
-    this.end = _.createAnchor('v-repeat')
+    this.end = _.createAnchor('v-repeat-end')
     _.replace(this.el, this.end)
     _.before(this.start, this.end)
     // check if this is a block repeat
@@ -102,7 +102,7 @@ module.exports = {
       // check inline-template
       if (this._checkParam('inline-template') !== null) {
         // extract inline template as a DocumentFragment
-        this.inlineTempalte = _.extractContent(this.el, true)
+        this.inlineTemplate = _.extractContent(this.el, true)
       }
       var tokens = textParser.parse(id)
       if (tokens) {
@@ -304,7 +304,7 @@ module.exports = {
           : targetPrev._blockEnd || targetPrev.$el
         : start
       if (vm._reused && !vm._staggerCb) {
-        currentPrev = findPrevVm(vm, start)
+        currentPrev = findPrevVm(vm, start, this.id)
         if (currentPrev !== targetPrev) {
           this.move(vm, prevEl)
         }
@@ -350,7 +350,7 @@ module.exports = {
       el: templateParser.clone(this.template),
       data: data,
       inherit: this.inherit,
-      template: this.inlineTempalte,
+      template: this.inlineTemplate,
       // repeater meta, e.g. $index, $key
       _meta: meta,
       // mark this as an inline-repeat instance
@@ -358,11 +358,13 @@ module.exports = {
       // is this a component?
       _asComponent: this.asComponent,
       // linker cachable if no inline-template
-      _linkerCachable: !this.inlineTempalte,
+      _linkerCachable: !this.inlineTemplate,
       // transclusion host
       _host: this._host,
       // pre-compiled linker for simple repeats
       _linkFn: this._linkFn,
+      // identifier, shows that this vm belongs to this collection
+      _repeatId: this.id
     }, Ctor)
     // cache instance
     if (needCache) {
@@ -668,14 +670,20 @@ module.exports = {
  * leaving transition finishes, but its __vue__ reference
  * should have been removed so we can skip them.
  *
+ * If this is a block repeat, we want to make sure we only
+ * return vm that is bound to this v-repeat. (see #929)
+ *
  * @param {Vue} vm
  * @param {Comment|Text} anchor
  * @return {Vue}
  */
 
-function findPrevVm (vm, anchor) {
+function findPrevVm (vm, anchor, id) {
   var el = vm.$el.previousSibling
-  while (!el.__vue__ && el !== anchor) {
+  while (
+    (!el.__vue__ || el.__vue__.$options._repeatId !== id) &&
+    el !== anchor
+  ) {
     el = el.previousSibling
   }
   return el.__vue__

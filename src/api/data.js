@@ -15,7 +15,9 @@ var filterRE = /[^|]\|[^|]/
 exports.$get = function (exp) {
   var res = expParser.parse(exp)
   if (res) {
-    return res.get.call(this, this)
+    try {
+      return res.get.call(this, this)
+    } catch (e) {}
   }
 }
 
@@ -62,21 +64,23 @@ exports.$delete = function (key) {
  *
  * @param {String} exp
  * @param {Function} cb
- * @param {Boolean} [deep]
- * @param {Boolean} [immediate]
+ * @param {Object} [options]
+ *                 - {Boolean} deep
+ *                 - {Boolean} immediate
+ *                 - {Boolean} user
  * @return {Function} - unwatchFn
  */
 
-exports.$watch = function (exp, cb, deep, immediate) {
+exports.$watch = function (exp, cb, options) {
   var vm = this
   var wrappedCb = function (val, oldVal) {
     cb.call(vm, val, oldVal)
   }
   var watcher = new Watcher(vm, exp, wrappedCb, {
-    deep: deep,
-    user: true
+    deep: options && options.deep,
+    user: !options || options.user !== false
   })
-  if (immediate) {
+  if (options && options.immediate) {
     wrappedCb(watcher.value)
   }
   return function unwatchFn () {

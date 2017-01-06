@@ -23,7 +23,7 @@ if (_.inBrowser) {
             _teardown: directiveTeardown
           })
         },
-        $set: jasmine.createSpy(),
+        $set: jasmine.createSpy('vm.$set'),
         $eval: function (value) {
           return data[value]
         },
@@ -146,6 +146,7 @@ if (_.inBrowser) {
     })
 
     it('props', function () {
+      var bindingModes = Vue.config._propBindingModes
       var options = _.mergeOptions(Vue.options, {
         _asComponent: true,
         props: [
@@ -153,7 +154,8 @@ if (_.inBrowser) {
           'data-some-attr',
           'some-other-attr',
           'multiple-attrs',
-          'oneway',
+          'onetime',
+          'twoway',
           'with-filter',
           'camelCase',
           'boolean-literal'
@@ -164,55 +166,55 @@ if (_.inBrowser) {
       el.setAttribute('data-some-attr', '{{a}}')
       el.setAttribute('some-other-attr', '2')
       el.setAttribute('multiple-attrs', 'a {{b}} c')
-      el.setAttribute('oneway', '{{*a}}')
+      el.setAttribute('onetime', '{{*a}}')
+      el.setAttribute('twoway', '{{@a}}')
       el.setAttribute('with-filter', '{{a | filter}}')
       el.setAttribute('boolean-literal', '{{true}}')
       transclude(el, options)
       compiler.compileAndLinkRoot(vm, el, options)
       // should skip literals and one-time bindings
-      expect(vm._bindDir.calls.count()).toBe(5)
+      expect(vm._bindDir.calls.count()).toBe(4)
       // data-some-attr
       var args = vm._bindDir.calls.argsFor(0)
       expect(args[0]).toBe('prop')
       expect(args[1]).toBe(null)
-      expect(args[2].arg).toBe('someAttr')
-      expect(args[2].expression).toBe('a')
+      expect(args[2].path).toBe('someAttr')
+      expect(args[2].parentPath).toBe('a')
+      expect(args[2].mode).toBe(bindingModes.ONE_WAY)
       expect(args[3]).toBe(def)
       // multiple-attrs
       args = vm._bindDir.calls.argsFor(1)
       expect(args[0]).toBe('prop')
       expect(args[1]).toBe(null)
-      expect(args[2].arg).toBe('multipleAttrs')
-      expect(args[2].expression).toBe('"a "+(b)+" c"')
+      expect(args[2].path).toBe('multipleAttrs')
+      expect(args[2].parentPath).toBe('"a "+(b)+" c"')
+      expect(args[2].mode).toBe(bindingModes.ONE_WAY)
       expect(args[3]).toBe(def)
-      // oneway
+      // two way
       args = vm._bindDir.calls.argsFor(2)
       expect(args[0]).toBe('prop')
       expect(args[1]).toBe(null)
-      expect(args[2].arg).toBe('oneway')
-      expect(args[2].oneWay).toBe(true)
-      expect(args[2].expression).toBe('a')
+      expect(args[2].path).toBe('twoway')
+      expect(args[2].mode).toBe(bindingModes.TWO_WAY)
+      expect(args[2].parentPath).toBe('a')
       expect(args[3]).toBe(def)
       // with-filter
       args = vm._bindDir.calls.argsFor(3)
       expect(args[0]).toBe('prop')
       expect(args[1]).toBe(null)
-      expect(args[2].arg).toBe('withFilter')
-      expect(args[2].expression).toBe('this._applyFilters(a,null,[{"name":"filter"}],false)')
+      expect(args[2].path).toBe('withFilter')
+      expect(args[2].parentPath).toBe('this._applyFilters(a,null,[{"name":"filter"}],false)')
+      expect(args[2].mode).toBe(bindingModes.ONE_WAY)
       expect(args[3]).toBe(def)
-      // boolean-literal
-      args = vm._bindDir.calls.argsFor(4)
-      expect(args[0]).toBe('prop')
-      expect(args[1]).toBe(null)
-      expect(args[2].arg).toBe('booleanLiteral')
-      expect(args[2].expression).toBe('true')
-      expect(args[2].oneWay).toBe(true)
       // camelCase should've warn
       expect(hasWarned(_, 'using camelCase')).toBe(true)
       // literal and one time should've called vm.$set
       // and numbers should be casted
+      expect(vm.$set.calls.count()).toBe(4)
       expect(vm.$set).toHaveBeenCalledWith('a', 1)
       expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', 2)
+      expect(vm.$set).toHaveBeenCalledWith('onetime', 'from parent: a')
+      expect(vm.$set).toHaveBeenCalledWith('booleanLiteral', 'from parent: true')
     })
 
     it('props on root instance', function () {

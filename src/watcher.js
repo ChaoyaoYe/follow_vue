@@ -18,14 +18,16 @@ var uid = 0
  *                 - {Boolean} twoWay
  *                 - {Boolean} deep
  *                 - {Boolean} user
+ *                 - {Boolean} sync
  *                 - {Function} [preProcess]
  * @constructor
  */
 
-function Watcher (vm, expression, cb, options) {
+function Watcher (vm, expOrFn, cb, options) {
+  var isFn = typeof expOrFn === 'function'
   this.vm = vm
   vm._watchers.push(this)
-  this.expression = expression
+  this.expression = isFn ? '' : expOrFn
   this.cb = cb
   this.id = ++uid // uid for batching
   this.active = true
@@ -33,14 +35,20 @@ function Watcher (vm, expression, cb, options) {
   this.deep = !!options.deep
   this.user = !!options.user
   this.twoWay = !!options.twoWay
+  this.sync = !!options.sync
   this.filters = options.filters
   this.preProcess = options.preProcess
   this.deps = []
   this.newDeps = []
   // parse expression for getter/setter
-  var res = expParser.parse(expression, options.twoWay)
-  this.getter = res.get
-  this.setter = res.set
+  if (isFn) {
+    this.getter = expOrFn
+    this.setter = undefined
+  } else {
+    var res = expParser.parse(expOrFn, options.twoWay)
+    this.getter = res.get
+    this.setter = res.set
+  }
   this.value = this.get()
 }
 
@@ -128,7 +136,7 @@ p.set = function (value) {
  */
 
 p.beforeGet = function () {
-  Observer.target = this
+  Observer.setTarget(this)
 }
 
 /**
@@ -136,7 +144,7 @@ p.beforeGet = function () {
  */
 
 p.afterGet = function () {
-  Observer.target = null
+  Observer.setTarget(null)
   var i = this.deps.length
   while (i--) {
     var dep = this.deps[i]
@@ -154,7 +162,7 @@ p.afterGet = function () {
  */
 
 p.update = function () {
-  if (!config.async) {
+  if (this.sync || !config.async) {
     this.run()
   } else {
     batcher.push(this)
@@ -171,7 +179,7 @@ p.run = function () {
     var value = this.get()
     if (
       value !== this.value ||
-      Array.isArray(value) ||
+      _.isArray(value) ||
       this.deep
     ) {
       var oldValue = this.value

@@ -42,6 +42,21 @@ exports.toNumber = function (value) {
 }
 
 /**
+ * Convert string boolean literals into real booleans.
+ *
+ * @param {*} value
+ * @return {*|Boolean}
+ */
+
+exports.toBoolean = function (value) {
+  return value === 'true'
+    ? true
+    : value === 'false'
+      ? false
+      : value
+}
+
+/**
  * Strip quotes from a string
  *
  * @param {String} str
@@ -157,7 +172,7 @@ exports.extend = function (to, from) {
  */
 
 exports.isObject = function (obj) {
-  return obj && typeof obj === 'object'
+  return obj !== null && typeof obj === 'object'
 }
 
 /**
@@ -180,9 +195,7 @@ exports.isPlainObject = function (obj) {
  * @return {Boolean}
  */
 
-exports.isArray = function (obj) {
-  return Array.isArray(obj)
-}
+exports.isArray = Array.isArray
 
 /**
  * Define a non-enumerable property

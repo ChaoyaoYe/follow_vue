@@ -11,10 +11,37 @@ var Dep = require('../observer/dep')
  */
 
 exports._initScope = function () {
+  this._initProps()
   this._initData()
   this._initComputed()
   this._initMethods()
   this._initMeta()
+}
+
+/**
+ * Initialize props.
+ */
+
+exports._initProps = function () {
+  // make sure all props properties are observed
+  var data = this._data
+  var props = this.$options.props
+  var prop, key, i
+  if (props) {
+    i = props.length
+    while (i--) {
+      prop = props[i]
+      // props can be strings or object descriptors
+      key = _.camelize(
+        typeof prop === 'string'
+          ? prop
+          : prop.name
+      )
+      if (!(key in data) && key !== '$data') {
+        data[key] = undefined
+      }
+    }
+  }
 }
 
 /**
@@ -24,19 +51,8 @@ exports._initScope = function () {
 exports._initData = function () {
   // proxy data on instance
   var data = this._data
-  var i, key
-  // make sure all props properties are observed
-  var props = this.$options.props
-  if (props) {
-    i = props.length
-    while (i--) {
-      key = _.camelize(props[i])
-      if (!(key in data) && key !== '$data') {
-        data[key] = undefined
-      }
-    }
-  }
   var keys = Object.keys(data)
+  var i, key
   i = keys.length
   while (i--) {
     key = keys[i]
@@ -59,13 +75,15 @@ exports._setData = function (newData) {
   var oldData = this._data
   this._data = newData
   var keys, key, i
-  // copy props
+  // copy props.
+  // this should only happen during a v-repeat of component
+  // that also happens to have compiled props.
   var props = this.$options.props
   if (props) {
     i = props.length
     while (i--) {
       key = props[i]
-      if (key !== '$data') {
+      if (key !== '$data' && !newData.hasOwnProperty(key)) {
         newData.$set(key, oldData[key])
       }
     }
@@ -221,9 +239,7 @@ exports._defineMeta = function (key, value) {
     enumerable: true,
     configurable: true,
     get: function metaGetter () {
-      if (Observer.target) {
-        Observer.target.addDep(dep)
-      }
+      dep.depend()
       return value
     },
     set: function metaSetter (val) {

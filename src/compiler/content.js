@@ -18,39 +18,60 @@ module.exports = {
     var raw = contentOwner.$options._content
     var content
     if (!raw) {
-      // fallback content
-      // extract as a fragment
-      content = _.extractContent(this.el, true)
-      this.compile(content, vm)
+      this.fallback()
       return
     }
     var parent = contentOwner.$parent
     var selector = this.el.getAttribute('select')
     if (!selector) {
-      // default content
-      // Importent: clone the rawContent before extracting
-      // content because the <content> may be inside a v-if
-      // and need to be compiled more than once.
-      content = _.extractContent(raw.cloneNode(true), true)
-      this.compile(content, parent, vm)
+      // Default content
+      var self = this
+      var compileDefaultContent = function () {
+        self.compile(
+          extractFragment(raw.childNodes, raw, true),
+          contentOwner.$parent,
+          vm
+        )
+      }
+      if (!contentOwner._isCompiled) {
+        // defer until the end of instance compilation,
+        // because the default outlet must wait until all
+        // other possible outlets with selectors have picked
+        // out their contents.
+        contentOwner.$once('hook:compiled', compileDefaultContent)
+      } else {
+        compileDefaultContent()
+      }
     } else {
       // select content
       selector = vm.$interpolate(selector)
-      content = raw.querySelector(selector)
-      // only allow top-level select
-      if (content && content.parentNode === raw) {
-        // same deal, clone the node for v-if
-        content = content.cloneNode(true)
-        this.compile(content, parent, vm)
+      var nodes = raw.querySelectorAll(selector)
+      if (nodes.length) {
+        content = extractFragment(nodes, raw)
+        if (content.hasChildNodes()) {
+          this.compile(content, parent, vm)
+        } else {
+          this.fallback()
+        }
+      } else {
+        this.fallback()
       }
     }
   },
 
+  fallback: function () {
+    this.compile(_.extractContent(this.el, true), this.vm)
+  },
+
   compile: function (content, owner, host) {
-    if (owner) {
+    if (content && owner) {
       this.unlink = owner.$compile(content, host)
     }
-    _.replace(this.el, content)
+    if (content) {
+      _.replace(this.el, content)
+    } else {
+      _.remove(this.el)
+    }
   },
 
   unbind: function () {
@@ -58,5 +79,33 @@ module.exports = {
       this.unlink()
     } 
   }
+}
 
+/**
+ * Extract qualified content nodes from a node list.
+ *
+ * @param {NodeList} nodes
+ * @param {Element} parent
+ * @param {Boolean} main
+ * @return {DocumentFragment}
+ */
+
+function extractFragment (nodes, parent, main) {
+  var frag = document.createDocumentFragment()
+  for (var i = 0, l = nodes.length; i < l; i++) {
+    var node = nodes[i]
+    // if this is the main outlet, we want to skip all
+    // previously selected nodes;
+    // otherwise, we want to mark the node as selected.
+    // clone the node so the original raw content remains
+    // intact. this ensures proper re-compilation in cases
+    // where the outlet is inside a conditional block
+    if (main && !node.selected) {
+      frag.appendChild(node.cloneNode(true))
+    } else if (!main && node.parentNode === parent) {
+      node.selected = true
+      frag.appendChild(node.cloneNode(true))
+    }
+  }
+  return frag
 }

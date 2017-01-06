@@ -15,6 +15,12 @@ describe('Content Transclusion', function () {
     vm = new Vue(options)
   }
 
+  it('no content', function () {
+    options.template = '<div><content></content></div>'
+    mount()
+    expect(el.firstChild.childNodes.length).toBe(0)
+  })
+
   it('default content', function () {
     el.innerHTML = '<p>hi</p>'
     options.template = '<div><content></content></div>'
@@ -22,6 +28,14 @@ describe('Content Transclusion', function () {
     expect(el.firstChild.tagName).toBe('DIV')
     expect(el.firstChild.firstChild.tagName).toBe('P')
     expect(el.firstChild.firstChild.textContent).toBe('hi')
+  })
+
+  it('no template auto content', function () {
+    el.innerHTML = '<p>hi</p>'
+    options._asComponent = true
+    mount()
+    expect(el.firstChild.tagName).toBe('P')
+    expect(el.firstChild.textContent).toBe('hi')
   })
 
   it('fallback content', function () {
@@ -33,11 +47,30 @@ describe('Content Transclusion', function () {
 
   it('fallback content with multiple select', function () {
     el.innerHTML = '<p class="b">select b</p>'
-    options.template = '<content select=".a"><p>fallback a</p></content><content select=".b">fallback b</content>'
+    options.template =
+      '<content select=".a"><p>fallback a</p></content>' +
+      '<content select=".b">fallback b</content>'
     mount()
     expect(el.childNodes.length).toBe(2)
     expect(el.firstChild.textContent).toBe('fallback a')
     expect(el.lastChild.textContent).toBe('select b')
+  })
+
+  it('selector matching multiple elements', function () {
+    el.innerHTML = '<p class="t">1</p><div></div><p class="t">2</p>'
+    options.template = '<content select=".t"></content>'
+    mount()
+    expect(el.innerHTML).toBe('<p class="t">1</p><p class="t">2</p>')
+  })
+
+  it('default content should only render parts not selected', function () {
+    el.innerHTML = '<div>hi</div><p class="a">1</p><p class="b">2</p>'
+    options.template =
+      '<content select=".a"></content>' +
+      '<content></content>' +
+      '<content select=".b"></content>'
+    mount()
+    expect(el.innerHTML).toBe('<p class="a">1</p><div>hi</div><p class="b">2</p>')
   })
 
   it('content transclusion with replace', function () {
@@ -71,8 +104,14 @@ describe('Content Transclusion', function () {
   })
 
   it('select should only match children', function () {
-    el.innerHTML = '<p class="b">select b</p><span><p class="b">nested b</p></span><span><p class="c">nested c</p></span>'
-    options.template = '<content select=".a"><p>fallback a</p></content><content select=".b">fallback b</content><content select=".c">fallback c</content>'
+    el.innerHTML =
+      '<p class="b">select b</p>' +
+      '<span><p class="b">nested b</p></span>' +
+      '<span><p class="c">nested c</p></span>'
+    options.template =
+      '<content select=".a"><p>fallback a</p></content>' +
+      '<content select=".b">fallback b</content>' +
+      '<content select=".c">fallback c</content>'
     mount()
     expect(el.childNodes.length).toBe(3)
     expect(el.firstChild.textContent).toBe('fallback a')
