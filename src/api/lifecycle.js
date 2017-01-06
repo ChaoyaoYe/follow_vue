@@ -1,5 +1,5 @@
 var _ = require('../util')
-var compile = require('../compiler/compile')
+var compiler = require('../compiler')
 
 /**
  * Set instance target element and kick off the compilation
@@ -64,9 +64,10 @@ exports.$destroy = function (remove, deferCleanup) {
  * decompile function.
  *
  * @param {Element|DocumentFragment} el
+ * @param {Vue} [host]
  * @return {Function}
  */
 
-exports.$compile = function (el) {
-  return compile(el, this.$options, true)(this, el)
+exports.$compile = function (el, host) {
+  return compiler.compile(el, this.$options, true, host)(this, el)
 }

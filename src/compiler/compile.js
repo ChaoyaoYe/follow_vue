@@ -15,8 +15,6 @@ var terminalDirectives = [
   'if'
 ]
 
-module.exports = compile
-
 /**
  * Compile a template and return a reusable composite link
  * function, which recursively contains more link functions
@@ -26,15 +24,15 @@ module.exports = compile
  * @param {Element|DocumentFragment} el
  * @param {Object} options
  * @param {Boolean} partial
- * @param {Boolean} transcluded
+ * @param {Vue} [host] - host vm of transcluded content
  * @return {Function}
  */
 
-function compile (el, options, partial, transcluded) {
+exports.compile = function (el, options, partial, host) {
   // link function for the node itself.
-  var nodeLinkFn = !partial
-    ? compileRoot(el, options)
-    : compileNode(el, options)
+  var nodeLinkFn = partial || !options._asComponent
+    ? compileNode(el, options)
+    : null
   // link function for the childNodes
   var childLinkFn =
     !(nodeLinkFn && nodeLinkFn.terminal) &&
@@ -53,27 +51,14 @@ function compile (el, options, partial, transcluded) {
    * @return {Function|undefined}
    */
 
-  function compositeLinkFn (vm, el) {
-    // save original directive count before linking
-    // so we can capture the directives created during a
-    // partial compilation.
-    var originalDirCount = vm._directives.length
-    var parentOriginalDirCount =
-      vm.$parent && vm.$parent._directives.length
+  return function compositeLinkFn (vm, el) {
     // cache childNodes before linking parent, fix #657
     var childNodes = _.toArray(el.childNodes)
-    // if this is a transcluded compile, linkers need to be
-    // called in source scope, and the host needs to be
-    // passed down.
-    var source = transcluded ? vm.$parent : vm
-    var host = transcluded ? vm : undefined
     // link
-    if (nodeLinkFn) nodeLinkFn(source, el, host)
-    if (childLinkFn) childLinkFn(source, childNodes, host)
-
-    var selfDirs = vm._directives.slice(originalDirCount)
-    var parentDirs = vm.$parent &&
-      vm.$parent._directives.slice(parentOriginalDirCount)
+    var dirs = linkAndCapture(function () {
+      if (nodeLinkFn) nodeLinkFn(vm, el, host)
+      if (childLinkFn) childLinkFn(vm, childNodes, host)
+    }, vm)
 
     /**
      * The linker function returns an unlink function that
@@ -83,24 +68,27 @@ function compile (el, options, partial, transcluded) {
      * @param {Boolean} destroying
      */
     return function unlink (destroying) {
-      teardownDirs(vm, selfDirs, destroying)
-      if (parentDirs) {
-        teardownDirs(vm.$parent, parentDirs)
-      }
+      teardownDirs(vm, dirs, destroying)
     }
   }
-
-  // transcluded linkFns are terminal, because it takes
-  // over the entire sub-tree.
-  if (transcluded) {
-    compositeLinkFn.terminal = true
-  }
-
-  return compositeLinkFn
 }
 
 /**
- * Teardown a subset of directives on a vm.
+ * Apply a linker to a vm/element pair and capture the
+ * directives created during the process.
+ *
+ * @param {Function} linker
+ * @param {Vue} vm
+ */
+
+function linkAndCapture (linker, vm) {
+  var originalDirCount = vm._directives.length
+  linker()
+  return vm._directives.slice(originalDirCount)
+}
+
+/**
+ * Teardown partial linked directives.
  *
  * @param {Vue} vm
  * @param {Array} dirs
@@ -108,6 +96,7 @@ function compile (el, options, partial, transcluded) {
  */
 
 function teardownDirs (vm, dirs, destroying) {
+  if (!dirs) return
   var i = dirs.length
   while (i--) {
     dirs[i]._teardown()
@@ -120,7 +109,7 @@ function teardownDirs (vm, dirs, destroying) {
 /**
  * Compile the root element of an instance. There are
  * 3 types of things to process here:
- * 
+ *
  * 1. props on parent container (child scope)
  * 2. other attrs on parent container (parent scope)
  * 3. attrs on the component template root node, if
@@ -129,20 +118,28 @@ function teardownDirs (vm, dirs, destroying) {
  * Also, if this is a block instance, we only need to
  * compile 1 & 2 here.
  *
+ * This function does compile and link at the same time,
+ * since root linkers can not be reused. It returns the
+ * unlink function for potential parent directives on the
+ * container.
+ *
+ * @param {Vue} vm
  * @param {Element} el
  * @param {Object} options
  * @return {Function}
  */
 
-function compileRoot (el, options) {
+ exports.compileAndLinkRoot = function (vm, el, options) {
   var containerAttrs = options._containerAttrs
   var replacerAttrs = options._replacerAttrs
   var props = options.props
   var propsLinkFn, parentLinkFn, replacerLinkFn
+
   // 1. props
   propsLinkFn = props && containerAttrs
     ? compileProps(el, containerAttrs, props)
     : null
+
   // only need to compile other attributes for
   // non-block instances
   if (el.nodeType !== 11) {
@@ -162,12 +159,27 @@ function compileRoot (el, options) {
       replacerLinkFn = compileDirectives(el, options)
     }
   }
-  return function rootLinkFn (vm, el, host) {
-    // explicitly passing null to props
-    // linkers because they don't need a real element
+
+  // link parent dirs
+  var parent = vm.$parent
+  var parentDirs
+  if (parent && parentLinkFn) {
+    parentDirs = linkAndCapture(function () {
+      parentLinkFn(parent, el)
+    }, parent)
+  }
+
+  // link self
+  var selfDirs = linkAndCapture(function () {
     if (propsLinkFn) propsLinkFn(vm, null)
-    if (parentLinkFn) parentLinkFn(vm.$parent, el, host)
-    if (replacerLinkFn) replacerLinkFn(vm, el, host)
+    if (replacerLinkFn) replacerLinkFn(vm, el)
+  }, vm)
+
+  // return the unlink function that tearsdown parent
+  // container directives.
+  return function rootUnlinkFn () {
+    teardownDirs(parent, parentDirs)
+    teardownDirs(vm, selfDirs)
   }
 }
 
@@ -201,16 +213,9 @@ function compileNode (node, options) {
 
 function compileElement (el, options) {
   var hasAttrs = el.hasAttributes()
-  if (hasAttrs && checkTransclusion(el)) {
-    // unwrap textNode
-    if (el.hasAttribute('__vue__wrap')) {
-      el = el.firstChild
-    }
-    return compile(el, options._parent.$options, true, true)
-  }
   // check element directives
   var linkFn = checkElementDirectives(el, options)
-  // check terminal direcitves (repeat & if)
+  // check terminal directives (repeat & if)
   if (!linkFn && hasAttrs) {
     linkFn = checkTerminalDirectives(el, options)
   }
@@ -391,7 +396,8 @@ function makeChildLinkFn (linkFns) {
 
 // regex to test if a path is "settable"
 // if not the prop binding is automatically one-way.
-var settablePathRE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*|\[[^\[\]]\])*$/
+var settablePathRE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*|\[[^\[\]]+\])*$/
+var literalValueRE = /^true|false|\d+$/
 
 function compileProps (el, attrs, propNames) {
   var props = []
@@ -426,7 +432,8 @@ function compileProps (el, attrs, propNames) {
         prop.oneTime =
           tokens.length > 1 ||
           tokens[0].oneTime ||
-          !settablePathRE.test(prop.value)
+          !settablePathRE.test(prop.value) ||
+          literalValueRE.test(prop.value)
       }
       props.push(prop)
     }
@@ -469,7 +476,7 @@ function makePropsLinkFn (props) {
         }
       } else {
         // just set once
-        vm.$set(path, prop.raw)
+        vm.$set(path, _.toNumber(prop.raw))
       }
     }
   }
@@ -706,19 +713,4 @@ function directiveComparator (a, b) {
   a = a.def.priority || 0
   b = b.def.priority || 0
   return a > b ? 1 : -1
-}
-
-/**
- * Check whether an element is transcluded
- *
- * @param {Element} el
- * @return {Boolean}
- */
-
-var transcludedFlagAttr = '__vue__transcluded'
-function checkTransclusion (el) {
-  if (el.nodeType === 1 && el.hasAttribute(transcludedFlagAttr)) {
-    el.removeAttribute(transcludedFlagAttr)
-    return true
-  }
 }

@@ -15,19 +15,29 @@ module.exports = {
       this.setProp(this.arg, value)
     } else {
       if (typeof value === 'object') {
-        // cache object styles so that only changed props
-        // are actually updated.
-        if (!this.cache) this.cache = {}
-        for (var prop in value) {
-          this.setProp(prop, value[prop])
-          /* jshint eqeqeq: false */
-          if (value[prop] != this.cache[prop]) {
-            this.cache[prop] = value[prop]
-            this.setProp(prop, value[prop])
-          }
-        }
+        this.objectHandler(value)
       } else {
         this.el.style.cssText = value
+      }
+    }
+  },
+
+  objectHandler: function (value) {
+    // cache object styles so that only changed props
+    // are actually updated.
+    var cache = this.cache || (this.cache = {})
+    var prop, val
+    for (prop in cache) {
+      if (!(prop in value)) {
+        this.setProp(prop, null)
+        delete cache[prop]
+      }
+    }
+    for (prop in value) {
+      val = value[prop]
+      if (val !== cache[prop]) {
+        cache[prop] = val
+        this.setProp(prop, val)
       }
     }
   },

@@ -1,8 +1,9 @@
 var Vue = require('../../../../src/vue')
 var _ = require('../../../../src/util')
 var dirParser = require('../../../../src/parsers/directive')
-var compile = require('../../../../src/compiler/compile')
-var transclude = require('../../../../src/compiler/transclude')
+var compiler = require('../../../../src/compiler')
+var compile = compiler.compile
+var transclude = compiler.transclude
 
 if (_.inBrowser) {
   describe('Compile', function () {
@@ -154,7 +155,8 @@ if (_.inBrowser) {
           'multiple-attrs',
           'oneway',
           'with-filter',
-          'camelCase'
+          'camelCase',
+          'boolean-literal'
         ]
       })
       var def = Vue.options.directives._prop
@@ -164,11 +166,11 @@ if (_.inBrowser) {
       el.setAttribute('multiple-attrs', 'a {{b}} c')
       el.setAttribute('oneway', '{{*a}}')
       el.setAttribute('with-filter', '{{a | filter}}')
+      el.setAttribute('boolean-literal', '{{true}}')
       transclude(el, options)
-      var linker = compile(el, options)
-      linker(vm, el)
+      compiler.compileAndLinkRoot(vm, el, options)
       // should skip literals and one-time bindings
-      expect(vm._bindDir.calls.count()).toBe(4)
+      expect(vm._bindDir.calls.count()).toBe(5)
       // data-some-attr
       var args = vm._bindDir.calls.argsFor(0)
       expect(args[0]).toBe('prop')
@@ -198,11 +200,19 @@ if (_.inBrowser) {
       expect(args[2].arg).toBe('withFilter')
       expect(args[2].expression).toBe('this._applyFilters(a,null,[{"name":"filter"}],false)')
       expect(args[3]).toBe(def)
+      // boolean-literal
+      args = vm._bindDir.calls.argsFor(4)
+      expect(args[0]).toBe('prop')
+      expect(args[1]).toBe(null)
+      expect(args[2].arg).toBe('booleanLiteral')
+      expect(args[2].expression).toBe('true')
+      expect(args[2].oneWay).toBe(true)
       // camelCase should've warn
       expect(hasWarned(_, 'using camelCase')).toBe(true)
       // literal and one time should've called vm.$set
-      expect(vm.$set).toHaveBeenCalledWith('a', '1')
-      expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', '2')
+      // and numbers should be casted
+      expect(vm.$set).toHaveBeenCalledWith('a', 1)
+      expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', 2)
     })
 
     it('props on root instance', function () {
@@ -216,8 +226,7 @@ if (_.inBrowser) {
       el.setAttribute('a', 'hi')
       el.setAttribute('b', '{{hi}}')
       transclude(el, options)
-      var linker = compile(el, options)
-      linker(vm, el)
+      compiler.compileAndLinkRoot(vm, el, options)
       expect(vm._bindDir.calls.count()).toBe(0)
       expect(vm.$set).toHaveBeenCalledWith('a', 'hi')
       expect(hasWarned(_, 'Cannot bind dynamic prop on a root')).toBe(true)
@@ -257,39 +266,6 @@ if (_.inBrowser) {
       expect(vm._bindDir.calls.count()).toBe(0)
     })
 
-    it('should handle nested transclusions', function (done) {
-      vm = new Vue({
-        el: el,
-        template:
-          '<testa>' +
-            '<testb>' +
-              '<div v-repeat="list">{{$value}}</div>' +
-            '</testb>' +
-          '</testa>',
-        data: {
-          list: [1,2]
-        },
-        components: {
-          testa: { template: '<content></content>' },
-          testb: { template: '<content></content>' }
-        }
-      })
-      expect(el.innerHTML).toBe(
-        '<testa><testb>' +
-          '<div>1</div><div>2</div>' +
-        '</testb></testa>'
-      )
-      vm.list.push(3)
-      _.nextTick(function () {
-        expect(el.innerHTML).toBe(
-          '<testa><testb>' +
-            '<div>1</div><div>2</div><div>3</div>' +
-          '</testb></testa>'
-        )
-        done()
-      })
-    })
-
     it('should handle container/replacer directives with same name', function () {
       var parentSpy = jasmine.createSpy()
       var childSpy = jasmine.createSpy()
@@ -318,7 +294,53 @@ if (_.inBrowser) {
       expect(childSpy).toHaveBeenCalledWith(2)
     })
 
-    it('should remove transcluded directives from parent when unlinking (v-component)', function () {
+    it('should teardown props and replacer directives when unlinking', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<test prop="{{msg}}"></test>',
+        data: {
+          msg: 'hi'
+        },
+        components: {
+          test: {
+            props: ['prop'],
+            template: '<div v-show="true"></div>',
+            replace: true
+          }
+        }
+      })
+      var dirs = vm._children[0]._directives
+      expect(dirs.length).toBe(2)
+      vm._children[0].$destroy()
+      var i = dirs.length
+      while (i--) {
+        expect(dirs[i]._bound).toBe(false)
+      }
+    })
+
+    it('should remove parent container directives from parent when unlinking', function () {
+      var vm = new Vue({
+        el: el,
+        template:
+          '<test v-show="ok"></test>',
+        data: {
+          ok: true
+        },
+        components: {
+          test: {
+            template: 'hi'
+          }
+        }
+      })
+      expect(el.firstChild.style.display).toBe('')
+      expect(vm._directives.length).toBe(2)
+      expect(vm._children.length).toBe(1)
+      vm._children[0].$destroy()
+      expect(vm._directives.length).toBe(1)
+      expect(vm._children.length).toBe(0)
+    })
+
+    it('should remove transcluded directives from parent when unlinking (component)', function () {
       var vm = new Vue({
         el: el,
         template:
@@ -340,7 +362,7 @@ if (_.inBrowser) {
       expect(vm._children.length).toBe(0)
     })
 
-    it('should remove transcluded directives from parent when unlinking (v-if + v-component)', function (done) {
+    it('should remove transcluded directives from parent when unlinking (v-if + component)', function (done) {
       var vm = new Vue({
         el: el,
         template:
