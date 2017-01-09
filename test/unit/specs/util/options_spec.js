@@ -3,6 +3,10 @@ var Vue = require('../../../../src/vue')
 var merge = _.mergeOptions
 
 describe('Util - Option merging', function () {
+
+  beforeEach(function () {
+    spyOn(_, 'warn')
+  })
   
   it('default strat', function () {
     // child undefined
@@ -114,12 +118,23 @@ describe('Util - Option merging', function () {
       components: null
     }, {
       components: {
+        test: { template: 'hi' }
+      }
+    })
+    expect(typeof res.components.test).toBe('function')
+    expect(res.components.test.options.name).toBe('test')
+    expect(res.components.test.super).toBe(Vue)
+  })
+
+  it('guard components warn built-in elements', function () {
+    var res = merge({
+      components: null
+    }, {
+      components: {
         a: { template: 'hi' }
       }
     })
-    expect(typeof res.components.a).toBe('function')
-    expect(res.components.a.options.name).toBe('a')
-    expect(res.components.a.super).toBe(Vue)
+    expect(hasWarned(_, 'Do not use built-in HTML elements')).toBe(true)
   })
 
   it('should ignore non-function el & data in class merge', function () {
@@ -190,7 +205,7 @@ describe('Util - Option merging', function () {
       {}, // no instance data
       {} // mock vm presence
     )
-    expect(res.data.a).toBe(1)
+    expect(res.data().a).toBe(1)
   })
 
   it('instance data merge with default data function', function () {
@@ -207,8 +222,9 @@ describe('Util - Option merging', function () {
       { data: { a: 2 }}, // instance data
       vm
     )
-    expect(res.data.a).toBe(2)
-    expect(res.data.b).toBe(2)
+    var data = res.data()
+    expect(data.a).toBe(2)
+    expect(data.b).toBe(2)
   })
 
   it('already observed instance data merge with default data', function () {
@@ -225,9 +241,10 @@ describe('Util - Option merging', function () {
       },
       {}
     )
-    expect(res.data.a).toBe(123)
-    expect(res.data.b).toBe(234)
-    expect(Object.getOwnPropertyDescriptor(res.data, 'b').get).toBeTruthy()
+    var data = res.data()
+    expect(data.a).toBe(123)
+    expect(data.b).toBe(234)
+    expect(Object.getOwnPropertyDescriptor(data, 'b').get).toBeTruthy()
   })
 
   it('mixins', function () {

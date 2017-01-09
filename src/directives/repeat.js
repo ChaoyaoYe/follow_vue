@@ -358,7 +358,7 @@ module.exports = {
       // is this a component?
       _asComponent: this.asComponent,
       // linker cachable if no inline-template
-      _linkerCachable: !this.inlineTemplate,
+      _linkerCachable: !this.inlineTemplate && Ctor !== _.Vue,
       // transclusion host
       _host: this._host,
       // pre-compiled linker for simple repeats
@@ -502,7 +502,9 @@ module.exports = {
     var data = vm._raw
     var idKey = this.idKey
     var index = vm.$index
-    var key = vm.$key
+    // fix #948: avoid accidentally fall through to
+    // a parent repeater which happens to have $key.
+    var key = vm.hasOwnProperty('$key') && vm.$key
     var primitive = !isObject(data)
     if (idKey || key || primitive) {
       var id = idKey

@@ -35,12 +35,57 @@ describe('Instance Scope', function () {
 
     it('should initialize props', function () {
       var vm = new Vue({
-        props: ['c'],
-        data: {
-          a: 1
-        }
+        el: document.createElement('div'),
+        props: ['c']
       })
       expect(vm.hasOwnProperty('c')).toBe(true)
+    })
+
+    it('should use default prop value if prop not provided', function () {
+      var vm = new Vue({
+        el: document.createElement('div'),
+        props: ['c'],
+        data: {
+          c: 1
+        }
+      })
+      expect(vm.c).toBe(1)
+    })
+
+    it('external prop should overwrite default value', function () {
+      var el = document.createElement('div')
+      el.setAttribute('c', '2')
+      el.textContent = '{{c}}'
+      var vm = new Vue({
+        el: el,
+        props: ['c'],
+        data: {
+          c: 1
+        }
+      })
+      expect(vm.c).toBe(2)
+      expect(el.textContent).toBe('2')
+    })
+
+    it('props should be available in data() and create()', function () {
+      var el = document.createElement('div')
+      el.setAttribute('c', '2')
+      var vm = new Vue({
+        el: el,
+        props: ['c'],
+        data: function () {
+          expect(this.c).toBe(2)
+          expect(this._data.c).toBe(2)
+          return {
+            d: this.c + 1
+          }
+        },
+        created: function () {
+          expect(this.c).toBe(2)
+          expect(this._data.c).toBe(2)
+        }
+      })
+      expect(vm.d).toBe(3)
     })
 
     it('replace $data', function () {
@@ -56,7 +101,7 @@ describe('Instance Scope', function () {
       expect(vm.hasOwnProperty('a')).toBe(false)
     })
 
-    it('replace $data and handle props', function () {
+    it('replace $data and handle props', function (done) {
       var el = document.createElement('div')
       var vm = new Vue({
         el: el,
@@ -95,15 +140,19 @@ describe('Instance Scope', function () {
         b: 3, // one-time
         c: 4  // two-way
       }
-      // one-way
       expect(child.a).toBe(2)
-      expect(vm.a).toBe(1)
-      // one-time
       expect(child.b).toBe(3)
-      expect(vm.b).toBe(2)
-      // two-way
       expect(child.c).toBe(4)
-      expect(vm.c).toBe(4)
+      // assert parent state
+      Vue.nextTick(function () {
+        // one-way
+        expect(vm.a).toBe(1)
+        // one-time
+        expect(vm.b).toBe(2)
+        // two-way
+        expect(vm.c).toBe(4)
+        done()
+      })
     })
 
   })

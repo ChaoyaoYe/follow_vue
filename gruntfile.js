@@ -53,7 +53,7 @@ module.exports = function (grunt) {
           },
           coverageReporter: {
             reporters: [
-              { type: 'lcov' },
+              { type: 'lcov', subdir: '.' },
               { type: 'text-summary' }
             ]
           }
@@ -68,25 +68,18 @@ module.exports = function (grunt) {
       sauce3: {
         options: sauceConfig.batch3
       }
-    },
-
-    coveralls: {
-      options: {
-        coverageDir: 'coverage/',
-        force: true
-      }
     }
 
   })
-  
+
   // load npm tasks
   grunt.loadNpmTasks('grunt-contrib-jshint')
   grunt.loadNpmTasks('grunt-karma')
-  grunt.loadNpmTasks('grunt-karma-coveralls')
 
   // load custom tasks
   require('./build/grunt-tasks/build')(grunt)
   require('./build/grunt-tasks/casper')(grunt)
+  require('./build/grunt-tasks/codecov')(grunt)
   require('./build/grunt-tasks/release')(grunt)
 
   // register composite tasks
@@ -94,7 +87,7 @@ module.exports = function (grunt) {
   grunt.registerTask('cover', ['karma:coverage'])
   grunt.registerTask('test', ['unit', 'cover', 'casper'])
   grunt.registerTask('sauce', ['karma:sauce1', 'karma:sauce2', 'karma:sauce3'])
-  grunt.registerTask('ci', ['jshint', 'cover', 'coveralls', 'build', 'casper', 'sauce'])
+  grunt.registerTask('ci', ['jshint', 'cover', 'codecov', 'build', 'casper', 'sauce'])
   grunt.registerTask('default', ['jshint', 'build', 'test'])
 
 }

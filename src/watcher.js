@@ -18,7 +18,6 @@ var uid = 0
  *                 - {Boolean} twoWay
  *                 - {Boolean} deep
  *                 - {Boolean} user
- *                 - {Boolean} sync
  *                 - {Function} [preProcess]
  * @constructor
  */
@@ -35,7 +34,6 @@ function Watcher (vm, expOrFn, cb, options) {
   this.deep = !!options.deep
   this.user = !!options.user
   this.twoWay = !!options.twoWay
-  this.sync = !!options.sync
   this.filters = options.filters
   this.preProcess = options.preProcess
   this.deps = []
@@ -88,7 +86,11 @@ p.get = function () {
     if (config.warnExpressionErrors) {
       _.warn(
         'Error when evaluating expression "' +
-        this.expression + '"', e
+        this.expression + '". ' +
+        (config.debug
+          ? '' :
+          'Turn on debug mode to see stack trace.'
+        ), e
       )
     }
   }
@@ -162,7 +164,7 @@ p.afterGet = function () {
  */
 
 p.update = function () {
-  if (this.sync || !config.async) {
+  if (!config.async) {
     this.run()
   } else {
     batcher.push(this)

@@ -1,3 +1,8 @@
+// NOTE: the prop internal directive is compiled and linked
+// during _initScope(), before the created hook is called.
+// The purpose is to make the initial prop values available
+// inside `created` hooks and `data` functions.
+
 var _ = require('../util')
 var Watcher = require('../watcher')
 var bindingModes = require('../config')._propBindingModes
@@ -17,46 +22,55 @@ module.exports = {
     // without this it would stabilize too, but this makes
     // sure it doesn't cause other watchers to re-evaluate.
     var locked = false
+    function withLock (fn) {
+      return function (val) {
+        if (!locked) {
+          locked = true
+          fn(val)
+          _.nextTick(function () {
+            locked = false
+          })
+        }
+      }
+    }
 
     this.parentWatcher = new Watcher(
       parent,
       parentKey,
-      function (val) {
-        if (!locked) {
-          locked = true
-          // all props have been initialized already
-          if (_.assertProp(prop, val)) {
-            child[childKey] = val
-          }
-          locked = false
+      withLock(function (val) {
+        if (_.assertProp(prop, val)) {
+          child[childKey] = val
         }
-      },
-      { sync: true }
+      })
     )
-    
-    // set the child initial value first, before setting
-    // up the child watcher to avoid triggering it
-    // immediately.
+
+    // set the child initial value.
+    // !!! We need to set it also on raw data here, because
+    // props are initialized before data is fully observed
     var value = this.parentWatcher.value
     if (_.assertProp(prop, value)) {
-      child.$set(childKey, value)
+      if (childKey === '$data') {
+        child._data = value
+      } else {
+        child[childKey] = child._data[childKey] = value
+      }
     }
 
     // only setup two-way binding if this is not a one-way
     // binding.
     if (prop.mode === bindingModes.TWO_WAY) {
-      this.childWatcher = new Watcher(
-        child,
-        childKey,
-        function (val) {
-          if (!locked) {
-            locked = true
-            parent.$set(parentKey, val)
-            locked = false
-          }
-        },
-        { sync: true }
-      )
+      // important: defer the child watcher creation until
+      // the created hook (after data observation)
+      var self = this
+      child.$once('hook:created', function () {
+        self.childWatcher = new Watcher(
+          child,
+          childKey,
+          withLock(function (val) {
+            parent[parentKey] = val
+          })
+        )
+      })
     }
   },
 

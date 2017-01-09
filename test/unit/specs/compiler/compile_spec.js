@@ -16,6 +16,7 @@ if (_.inBrowser) {
       data = {}
       directiveTeardown = jasmine.createSpy()
       vm = {
+        _data: {},
         _directives: [],
         _bindDir: function (name) {
           this._directives.push({
@@ -23,7 +24,6 @@ if (_.inBrowser) {
             _teardown: directiveTeardown
           })
         },
-        $set: jasmine.createSpy('vm.$set'),
         $eval: function (value) {
           return data[value]
         },
@@ -147,20 +147,17 @@ if (_.inBrowser) {
 
     it('props', function () {
       var bindingModes = Vue.config._propBindingModes
-      var options = _.mergeOptions(Vue.options, {
-        _asComponent: true,
-        props: [
-          'a',
-          'data-some-attr',
-          'some-other-attr',
-          'multiple-attrs',
-          'onetime',
-          'twoway',
-          'with-filter',
-          'camelCase',
-          'boolean-literal'
-        ]
-      })
+      var props = [
+        'a',
+        'data-some-attr',
+        'some-other-attr',
+        'multiple-attrs',
+        'onetime',
+        'twoway',
+        'with-filter',
+        'camelCase',
+        'boolean-literal'
+      ]
       var def = Vue.options.directives._prop
       el.setAttribute('a', '1')
       el.setAttribute('data-some-attr', '{{a}}')
@@ -170,8 +167,7 @@ if (_.inBrowser) {
       el.setAttribute('twoway', '{{@a}}')
       el.setAttribute('with-filter', '{{a | filter}}')
       el.setAttribute('boolean-literal', '{{true}}')
-      transclude(el, options)
-      compiler.compileAndLinkRoot(vm, el, options)
+      compiler.compileAndLinkProps(vm, el, props)
       // should skip literals and one-time bindings
       expect(vm._bindDir.calls.count()).toBe(4)
       // data-some-attr
@@ -206,31 +202,32 @@ if (_.inBrowser) {
       expect(args[2].parentPath).toBe('this._applyFilters(a,null,[{"name":"filter"}],false)')
       expect(args[2].mode).toBe(bindingModes.ONE_WAY)
       expect(args[3]).toBe(def)
+      // literal and one time should've been set on the _data
+      // and numbers should be casted
+      expect(Object.keys(vm._data).length).toBe(5)
+      expect(vm.a).toBe(1)
+      expect(vm._data.a).toBe(1)
+      expect(vm.someOtherAttr).toBe(2)
+      expect(vm._data.someOtherAttr).toBe(2)
+      expect(vm.onetime).toBe('from parent: a')
+      expect(vm._data.onetime).toBe('from parent: a')
+      expect(vm.booleanLiteral).toBe('from parent: true')
+      expect(vm._data.booleanLiteral).toBe('from parent: true')
+      expect(vm._data.camelCase).toBeUndefined()
       // camelCase should've warn
       expect(hasWarned(_, 'using camelCase')).toBe(true)
-      // literal and one time should've called vm.$set
-      // and numbers should be casted
-      expect(vm.$set.calls.count()).toBe(4)
-      expect(vm.$set).toHaveBeenCalledWith('a', 1)
-      expect(vm.$set).toHaveBeenCalledWith('someOtherAttr', 2)
-      expect(vm.$set).toHaveBeenCalledWith('onetime', 'from parent: a')
-      expect(vm.$set).toHaveBeenCalledWith('booleanLiteral', 'from parent: true')
     })
 
     it('props on root instance', function () {
       // temporarily remove vm.$parent
       var parent = vm.$parent
       vm.$parent = null
-      var options = _.mergeOptions(Vue.options, {
-        props: ['a', 'b']
-      })
       var def = Vue.options.directives._prop
       el.setAttribute('a', 'hi')
       el.setAttribute('b', '{{hi}}')
-      transclude(el, options)
-      compiler.compileAndLinkRoot(vm, el, options)
+      compiler.compileAndLinkProps(vm, el, ['a', 'b'])
       expect(vm._bindDir.calls.count()).toBe(0)
-      expect(vm.$set).toHaveBeenCalledWith('a', 'hi')
+      expect(vm._data.a).toBe('hi')
       expect(hasWarned(_, 'Cannot bind dynamic prop on a root')).toBe(true)
       // restore parent mock
       vm.$parent = parent

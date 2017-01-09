@@ -177,12 +177,14 @@ exports.extractContent = function (el, asFragment) {
   var rawContent
   /* istanbul ignore if */
   if (
-    el.tagName === 'TEMPLATE' &&
+    exports.isTemplate(el) &&
     el.content instanceof DocumentFragment
   ) {
     el = el.content
   }
   if (el.hasChildNodes()) {
+    trim(el, el.firstChild)
+    trim(el, el.lastChild)
     rawContent = asFragment
       ? document.createDocumentFragment()
       : document.createElement('div')
@@ -192,4 +194,23 @@ exports.extractContent = function (el, asFragment) {
     }
   }
   return rawContent
+}
+
+function trim (content, node) {
+  if (node && node.nodeType === 3 && !node.data.trim()) {
+    content.removeChild(node)
+  }
+}
+
+/**
+ * Check if an element is a template tag.
+ * Note if the template appears inside an SVG its tagName
+ * will be in lowercase.
+ *
+ * @param {Element} el
+ */
+
+exports.isTemplate = function (el) {
+  return el.tagName &&
+    el.tagName.toLowerCase() === 'template'
 }

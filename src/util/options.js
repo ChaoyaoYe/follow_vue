@@ -65,18 +65,20 @@ strats.data = function (parentVal, childVal, vm) {
         parentVal.call(this)
       )
     }
-  } else {
-    // instance merge, return raw object
-    var instanceData = typeof childVal === 'function'
-      ? childVal.call(vm)
-      : childVal
-    var defaultData = typeof parentVal === 'function'
-      ? parentVal.call(vm)
-      : undefined
-    if (instanceData) {
-      return mergeData(instanceData, defaultData)
-    } else {
-      return defaultData
+  } else if (parentVal || childVal) {
+    return function mergedInstanceDataFn () {
+      // instance merge
+      var instanceData = typeof childVal === 'function'
+        ? childVal.call(vm)
+        : childVal
+      var defaultData = typeof parentVal === 'function'
+        ? parentVal.call(vm)
+        : undefined
+      if (instanceData) {
+        return mergeData(instanceData, defaultData)
+      } else {
+        return defaultData
+      }
     }
   }
 }
@@ -147,6 +149,7 @@ strats.directives =
 strats.filters =
 strats.transitions =
 strats.components =
+strats.partials =
 strats.elementDirectives = function (parentVal, childVal) {
   var res = Object.create(parentVal)
   return childVal
@@ -214,6 +217,12 @@ function guardComponents (components) {
   if (components) {
     var def
     for (var key in components) {
+      if (_.commonTagRE.test(key)) {
+        _.warn(
+          'Do not use built-in HTML elements as component ' +
+          'name: ' + key
+        )
+      }
       def = components[key]
       if (_.isPlainObject(def)) {
         def.name = key

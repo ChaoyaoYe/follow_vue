@@ -110,14 +110,14 @@ if (_.inBrowser) {
         el: el,
         data: {
           ok: false,
-          view: 'a'
+          view: 'view-a'
         },
         template: '<component is="{{view}}" v-if="ok"></component>',
         components: {
-          a: {
+          'view-a': {
             template: 'AAA'
           },
-          b: {
+          'view-b': {
             template: 'BBB'
           }
         }
@@ -130,7 +130,7 @@ if (_.inBrowser) {
         expect(el.innerHTML).toBe('<component>AAA</component>')
         expect(vm._children.length).toBe(1)
         // switch view when if=true
-        vm.view = 'b'
+        vm.view = 'view-b'
         _.nextTick(function () {
           expect(el.innerHTML).toBe('<component>BBB</component>')
           expect(vm._children.length).toBe(1)
@@ -140,7 +140,7 @@ if (_.inBrowser) {
             expect(el.innerHTML).toBe('')
             expect(vm._children.length).toBe(0)
             // toggle if and switch view at the same time
-            vm.view = 'a'
+            vm.view = 'view-a'
             vm.ok = true
             _.nextTick(function () {
               expect(el.innerHTML).toBe('<component>AAA</component>')
@@ -173,7 +173,7 @@ if (_.inBrowser) {
       var vm = new Vue({
         el: el
       })
-      expect(hasWarned(_, 'already mounted instance')).toBe(true)
+      expect(hasWarned(_, 'cannot be used on an instance root element')).toBe(true)
     })
 
     it('call attach/detach for transcluded components', function (done) {
