@@ -44,21 +44,23 @@ module.exports = {
   },
 
   insert: function (id) {
-    var partial = this.vm.$options.partials[id]
+    var partial = _.resolveAsset(this.vm.$options, 'partials', id)
     _.assertAsset(partial, 'partial', id)
     if (partial) {
       var frag = templateParser.parse(partial, true)
-      var linker = this.compile(frag, partial)
+      // cache partials based on constructor id.
+      var cacheId = (this.vm.constructor.cid || '') + partial
+      var linker = this.compile(frag, cacheId)
       // this is provided by v-if
       this.link(frag, linker)
     }
   },
 
-  compile: function (frag, partial) {
-    var hit = cache.get(partial)
+  compile: function (frag, cacheId) {
+    var hit = cache.get(cacheId)
     if (hit) return hit
     var linker = compiler.compile(frag, this.vm.$options, true)
-    cache.put(partial, linker)
+    cache.put(cacheId, linker)
     return linker
   },
 

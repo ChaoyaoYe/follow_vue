@@ -233,6 +233,33 @@ function guardComponents (components) {
 }
 
 /**
+ * Ensure all props option syntax are normalized into the
+ * Object-based format.
+ *
+ * @param {Object} options
+ */
+
+function guardProps (options) {
+  var props = options.props
+  if (_.isPlainObject(props)) {
+    options.props = Object.keys(props).map(function (key) {
+      var val = props[key]
+      if (!_.isPlainObject(val)) {
+        val = { type: val }
+      }
+      val.name = key
+      return val
+    })
+  } else if (_.isArray(props)) {
+    options.props = props.map(function (prop) {
+      return typeof prop === 'string'
+        ? { name: prop }
+        : prop
+    })
+  }
+}
+
+/**
  * Merge two option objects into a new one.
  * Core utility used in both instantiation and inheritance.
  *
@@ -244,6 +271,7 @@ function guardComponents (components) {
 
 exports.mergeOptions = function merge (parent, child, vm) {
   guardComponents(child.components)
+  guardProps(child)
   var options = {}
   var key
   if (child.mixins) {

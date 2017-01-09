@@ -12,7 +12,7 @@ module.exports = {
   bind: function () {
 
     var child = this.vm
-    var parent = child.$parent
+    var parent = child._context
     // passed in from compiler directly
     var prop = this._descriptor
     var childKey = prop.path
@@ -67,7 +67,7 @@ module.exports = {
           child,
           childKey,
           withLock(function (val) {
-            parent[parentKey] = val
+            parent.$set(parentKey, val)
           })
         )
       })

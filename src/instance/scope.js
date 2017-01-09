@@ -27,21 +27,23 @@ exports._initProps = function () {
   var options = this.$options
   var el = options.el
   var props = options.props
-  this._propsUnlinkFn = el && props
-    ? compiler.compileAndLinkProps(
-        this, el, props
-      )
-    : null
   if (props && !el) {
     _.warn(
       'Props will not be compiled if no `el` option is ' +
       'provided at instantiation.'
     )
   }
+  // make sure to convert string selectors into element now
+  el = options.el = _.query(el)
+  this._propsUnlinkFn = el && props
+    ? compiler.compileAndLinkProps(
+        this, el, props
+      )
+    : null
 }
 
 /**
- * Initialize the data. 
+ * Initialize the data.
  */
 
 exports._initData = function () {
@@ -55,7 +57,7 @@ exports._initData = function () {
         !optionsData.hasOwnProperty(prop) ||
         propsData[prop] !== undefined
       ) {
-        optionsData[prop] = propsData[prop]
+        optionsData.$set(prop, propsData[prop])
       }
     }
   }
@@ -92,7 +94,7 @@ exports._setData = function (newData) {
   if (props) {
     i = props.length
     while (i--) {
-      key = props[i]
+      key = props[i].name
       if (key !== '$data' && !newData.hasOwnProperty(key)) {
         newData.$set(key, oldData[key])
       }
@@ -166,7 +168,7 @@ exports._digest = function () {
   while (i--) {
     this._watchers[i].update()
   }
-  var children = this._children
+  var children = this.$children
   i = children.length
   while (i--) {
     var child = children[i]

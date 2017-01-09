@@ -28,7 +28,7 @@ module.exports = {
       this.invalid = true
       _.warn(
         'v-if="' + this.expression + '" cannot be ' +
-        'used on an already mounted instance.'
+        'used on an instance root element.'
       )
     }
   },
@@ -39,19 +39,19 @@ module.exports = {
       // avoid duplicate compiles, since update() can be
       // called with different truthy values
       if (!this.unlink) {
-        this.compile()
+        this.link(
+          templateParser.clone(this.template),
+          this.linker
+        )
       }
     } else {
       this.teardown()
     }
   },
 
-  compile: function () {
+  link: function (frag, linker) {
     var vm = this.vm
-    var frag = templateParser.clone(this.template)
-    // the linker is not guaranteed to be present because
-    // this function might get called by v-partial 
-    this.unlink = this.linker(vm, frag)
+    this.unlink = linker(vm, frag)
     transition.blockAppend(frag, this.end, vm)
     // call attached for all the child components created
     // during the compilation
@@ -78,12 +78,6 @@ module.exports = {
     var vm = this.vm
     var start = this.start.nextSibling
     var end = this.end
-    var selfCompoents =
-      vm._children.length &&
-      vm._children.filter(contains)
-    var transComponents =
-      vm._transCpnts &&
-      vm._transCpnts.filter(contains)
 
     function contains (c) {
       var cur = start
@@ -101,11 +95,8 @@ module.exports = {
       return false
     }
 
-    return selfCompoents
-      ? transComponents
-        ? selfCompoents.concat(transComponents)
-        : selfCompoents
-      : transComponents
+    return vm.$children.length &&
+      vm.$children.filter(contains)
   },
 
   unbind: function () {

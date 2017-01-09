@@ -71,10 +71,12 @@ module.exports = {
    */
 
   _assetTypes: [
+    'component',
     'directive',
     'elementDirective',
     'filter',
-    'transition'
+    'transition',
+    'partial'
   ],
 
   /**

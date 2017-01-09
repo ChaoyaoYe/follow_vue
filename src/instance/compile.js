@@ -127,17 +127,12 @@ exports._destroy = function (remove, deferCleanup) {
   // if parent is not being destroyed as well.
   var parent = this.$parent
   if (parent && !parent._isBeingDestroyed) {
-    parent._children.$remove(this)
-  }
-  // same for transclusion host.
-  var host = this._host
-  if (host && !host._isBeingDestroyed) {
-    host._transCpnts.$remove(this)
+    parent.$children.$remove(this)
   }
   // destroy all children.
-  i = this._children.length
+  i = this.$children.length
   while (i--) {
-    this._children[i].$destroy()
+    this.$children[i].$destroy()
   }
   // teardown props
   if (this._propsUnlinkFn) {
@@ -181,8 +176,7 @@ exports._cleanup = function () {
   this.$el =
   this.$parent =
   this.$root =
-  this._children =
-  this._transCpnts =
+  this.$children =
   this._directives = null
   // call the last hook...
   this._isDestroyed = true

@@ -26,6 +26,8 @@ module.exports = {
       // we simply remove it from the DOM and save it in a
       // cache object, with its constructor id as the key.
       this.keepAlive = this._checkParam('keep-alive') != null
+      // wait for event before insertion
+      this.readyEvent = this._checkParam('wait-for')
       // check ref
       this.refID = _.attr(this.el, 'ref')
       if (this.keepAlive) {
@@ -42,14 +44,9 @@ module.exports = {
       this.Ctor = null
       // if static, build right now.
       if (!this._isDynamicLiteral) {
-        this.resolveCtor(this.expression, _.bind(function () {
-          var child = this.build()
-          child.$before(this.anchor)
-          this.setCurrent(child)
-        }, this))
+        this.resolveCtor(this.expression, _.bind(this.initStatic, this))
       } else {
         // check dynamic component params
-        this.readyEvent = this._checkParam('wait-for')
         this.transMode = this._checkParam('transition-mode')
       }
     } else {
@@ -59,6 +56,23 @@ module.exports = {
         'the same element and cause conflict. Wrap it with ' +
         'an outer element.'
       )
+    }
+  },
+
+  /**
+   * Initialize a static component.
+   */
+
+  initStatic: function () {
+    var child = this.build()
+    var anchor = this.anchor
+    this.setCurrent(child)
+    if (!this.readyEvent) {
+      child.$before(anchor)
+    } else {
+      child.$once(this.readyEvent, function () {
+        child.$before(anchor)
+      })
     }
   },
 
@@ -152,10 +166,10 @@ module.exports = {
         return cached
       }
     }
-    var vm = this.vm
-    var el = templateParser.clone(this.el)
     if (this.Ctor) {
-      var child = vm.$addChild({
+      var parent = this._host || this.vm
+      var el = templateParser.clone(this.el)
+      var child = parent.$addChild({
         el: el,
         data: data,
         template: this.template,
@@ -163,8 +177,8 @@ module.exports = {
         // linker can be cached for better performance.
         _linkerCachable: !this.template,
         _asComponent: true,
-        _host: this._host,
-        _isRouterView: this._isRouterView
+        _isRouterView: this._isRouterView,
+        _context: this.vm
       }, this.Ctor)
       if (this.keepAlive) {
         this.cache[this.ctorId] = child
@@ -243,7 +257,7 @@ module.exports = {
   /**
    * Set childVM and parent ref
    */
-  
+
   setCurrent: function (child) {
     this.childVM = child
     var refID = child._refID || this.refID
@@ -272,6 +286,7 @@ module.exports = {
   unbind: function () {
     this.invalidatePending()
     this.unbuild()
+    this.unsetCurrent()
     // destroy all keep-alive cached instances
     if (this.cache) {
       for (var key in this.cache) {

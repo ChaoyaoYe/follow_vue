@@ -65,7 +65,6 @@ exports.compile = function (el, options, partial, host) {
       if (nodeLinkFn) nodeLinkFn(vm, el, host)
       if (childLinkFn) childLinkFn(vm, childNodes, host)
     }, vm)
-    // 
     return makeUnlinkFn(vm, dirs)
   }
 }
@@ -88,22 +87,22 @@ function linkAndCapture (linker, vm) {
  * Linker functions return an unlink function that
  * tearsdown all directives instances generated during
  * the process.
- * 
+ *
  * We create unlink functions with only the necessary
  * information to avoid retaining additional closures.
  *
  * @param {Vue} vm
  * @param {Array} dirs
- * @param {Vue} [parent]
- * @param {Array} [parentDirs]
+ * @param {Vue} [context]
+ * @param {Array} [contextDirs]
  * @return {Function}
  */
 
-function makeUnlinkFn (vm, dirs, parent, parentDirs) {
+function makeUnlinkFn (vm, dirs, context, contextDirs) {
   return function unlink (destroying) {
     teardownDirs(vm, dirs, destroying)
-    if (parent && parentDirs) {
-      teardownDirs(parent, parentDirs)
+    if (context && contextDirs) {
+      teardownDirs(context, contextDirs)
     }
   }
 }
@@ -146,7 +145,7 @@ exports.compileAndLinkProps = function (vm, el, props) {
 /**
  * Compile the root element of an instance.
  *
- * 1. attrs on parent container (parent scope)
+ * 1. attrs on context container (context scope)
  * 2. attrs on the component template root node, if
  *    replace:true (child scope)
  *
@@ -154,7 +153,7 @@ exports.compileAndLinkProps = function (vm, el, props) {
  *
  * This function does compile and link at the same time,
  * since root linkers can not be reused. It returns the
- * unlink function for potential parent directives on the
+ * unlink function for potential context directives on the
  * container.
  *
  * @param {Vue} vm
@@ -163,10 +162,10 @@ exports.compileAndLinkProps = function (vm, el, props) {
  * @return {Function}
  */
 
- exports.compileAndLinkRoot = function (vm, el, options) {
+exports.compileAndLinkRoot = function (vm, el, options) {
   var containerAttrs = options._containerAttrs
   var replacerAttrs = options._replacerAttrs
-  var parentLinkFn, replacerLinkFn
+  var contextLinkFn, replacerLinkFn
 
   // only need to compile other attributes for
   // non-block instances
@@ -176,7 +175,7 @@ exports.compileAndLinkProps = function (vm, el, props) {
     if (options._asComponent) {
       // 2. container attributes
       if (containerAttrs) {
-        parentLinkFn = compileDirectives(containerAttrs, options)
+        contextLinkFn = compileDirectives(containerAttrs, options)
       }
       if (replacerAttrs) {
         // 3. replacer attributes
@@ -188,13 +187,13 @@ exports.compileAndLinkProps = function (vm, el, props) {
     }
   }
 
-  // link parent dirs
-  var parent = vm.$parent
-  var parentDirs
-  if (parent && parentLinkFn) {
-    parentDirs = linkAndCapture(function () {
-      parentLinkFn(parent, el)
-    }, parent)
+  // link context scope dirs
+  var context = vm._context
+  var contextDirs
+  if (context && contextLinkFn) {
+    contextDirs = linkAndCapture(function () {
+      contextLinkFn(context, el)
+    }, context)
   }
 
   // link self
@@ -202,9 +201,9 @@ exports.compileAndLinkProps = function (vm, el, props) {
     if (replacerLinkFn) replacerLinkFn(vm, el)
   }, vm)
 
-  // return the unlink function that tearsdown parent
+  // return the unlink function that tearsdown context
   // container directives.
-  return makeUnlinkFn(vm, selfDirs, parent, parentDirs)
+  return makeUnlinkFn(vm, selfDirs, context, contextDirs)
 }
 
 /**
@@ -236,16 +235,19 @@ function compileNode (node, options) {
  */
 
 function compileElement (el, options) {
+  var linkFn
   var hasAttrs = el.hasAttributes()
-  // check element directives
-  var linkFn = checkElementDirectives(el, options)
   // check terminal directives (repeat & if)
-  if (!linkFn && hasAttrs) {
+  if (hasAttrs) {
     linkFn = checkTerminalDirectives(el, options)
+  }
+  // check element directives
+  if (!linkFn) {
+    linkFn = checkElementDirectives(el, options)
   }
   // check component
   if (!linkFn) {
-    linkFn = checkComponent(el, options)
+    linkFn = checkComponent(el, options, hasAttrs)
   }
   // normal directives
   if (!linkFn && hasAttrs) {
@@ -413,7 +415,7 @@ function makeChildLinkFn (linkFns) {
  * a props link function.
  *
  * @param {Element|DocumentFragment} el
- * @param {Array} propDescriptors
+ * @param {Array} propOptions
  * @return {Function} propsLinkFn
  */
 
@@ -422,20 +424,13 @@ var settablePathRE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*|\[[^\[\]]+\])*$/
 var literalValueRE = /^(true|false)$|^\d.*/
 var identRE = require('../parsers/path').identRE
 
-function compileProps (el, propDescriptors) {
+function compileProps (el, propOptions) {
   var props = []
-  var i = propDescriptors.length
-  var descriptor, name, assertions, value, path, prop, literal, single
+  var i = propOptions.length
+  var options, name, value, path, prop, literal, single
   while (i--) {
-    descriptor = propDescriptors[i]
-    // normalize prop string/descriptor
-    if (typeof descriptor === 'object') {
-      name = descriptor.name
-      assertions = descriptor
-    } else {
-      name = descriptor
-      assertions = null
-    }
+    options = propOptions[i]
+    name = options.name
     // props could contain dashes, which will be
     // interpreted as minus calculations by the parser
     // so we need to camelize the path here
@@ -461,7 +456,7 @@ function compileProps (el, propDescriptors) {
       name: name,
       raw: value,
       path: path,
-      assertions: assertions,
+      options: options,
       mode: propBindingModes.ONE_WAY
     }
     if (value !== null) {
@@ -495,7 +490,7 @@ function compileProps (el, propDescriptors) {
           }
         }
       }
-    } else if (assertions && assertions.required) {
+    } else if (options && options.required) {
       _.warn('Missing required prop: ' + name)
     }
     props.push(prop)
@@ -513,19 +508,24 @@ function compileProps (el, propDescriptors) {
 function makePropsLinkFn (props) {
   return function propsLinkFn (vm, el) {
     var i = props.length
-    var prop, path, value
+    var prop, path, options, value
     while (i--) {
       prop = props[i]
       path = prop.path
+      options = prop.options
       if (prop.raw === null) {
-        // initialize undefined prop
-        vm._data[path] = undefined
+        // initialize absent prop
+        vm._data[path] = options.type === Boolean
+          ? false
+          : options.hasOwnProperty('default')
+            ? options.default
+            : undefined
       } else if (prop.dynamic) {
         // dynamic prop
-        if (vm.$parent) {
+        if (vm._context) {
           if (prop.mode === propBindingModes.ONE_TIME) {
             // one time binding
-            value = vm.$parent.$get(prop.parentPath)
+            value = vm._context.$get(prop.parentPath)
             if (_.assertProp(prop, value)) {
               vm[path] = vm._data[path] = value
             }
@@ -542,7 +542,9 @@ function makePropsLinkFn (props) {
         }
       } else {
         // literal, cast it and just set once
-        value = _.toBoolean(_.toNumber(prop.raw))
+        value = options.type === Boolean && prop.raw === ''
+          ? true
+          : _.toBoolean(_.toNumber(prop.raw))
         if (_.assertProp(prop, value)) {
           vm[path] = vm._data[path] = value
         }
@@ -561,6 +563,7 @@ function makePropsLinkFn (props) {
 
 function checkElementDirectives (el, options) {
   var tag = el.tagName.toLowerCase()
+  if (_.commonTagRE.test(tag)) return
   var def = resolveAsset(options, 'elementDirectives', tag)
   if (def) {
     return makeTerminalNodeLinkFn(el, tag, '', options, def)
@@ -573,11 +576,12 @@ function checkElementDirectives (el, options) {
  *
  * @param {Element} el
  * @param {Object} options
+ * @param {Boolean} hasAttrs
  * @return {Function|undefined}
  */
 
-function checkComponent (el, options) {
-  var componentId = _.checkComponent(el, options)
+function checkComponent (el, options, hasAttrs) {
+  var componentId = _.checkComponent(el, options, hasAttrs)
   if (componentId) {
     var componentLinkFn = function (vm, el, host) {
       vm._bindDir('component', el, {
@@ -603,7 +607,6 @@ function checkTerminalDirectives (el, options) {
     return skip
   }
   var value, dirName
-  /* jshint boss: true */
   for (var i = 0, l = terminalDirectives.length; i < l; i++) {
     dirName = terminalDirectives[i]
     if ((value = _.attr(el, dirName)) !== null) {

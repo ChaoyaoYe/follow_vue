@@ -15,51 +15,47 @@ exports._init = function (options) {
 
   options = options || {}
 
-  this.$el           = null
-  this.$parent       = options._parent
-  this.$root         = options._root || this
-  this.$             = {} // child vm references
-  this.$$            = {} // element references
-  this._watchers     = [] // all watchers as an array
-  this._directives   = [] // all directives
+  this.$el = null
+  this.$parent = options._parent
+  this.$root = options._root || this
+  this.$children = []
+  this.$ = {}           // child vm references
+  this.$$ = {}          // element references
+  this._watchers = []   // all watchers as an array
+  this._directives = [] // all directives
+  this._childCtors = {} // inherit:true constructors
 
   // a flag to avoid this being observed
   this._isVue = true
 
   // events bookkeeping
-  this._events         = {}    // registered callbacks
-  this._eventsCount    = {}    // for $broadcast optimization
+  this._events = {}            // registered callbacks
+  this._eventsCount = {}       // for $broadcast optimization
   this._eventCancelled = false // for event cancellation
 
   // block instance properties
-  this._isBlock     = false
-  this._blockStart  =          // @type {CommentNode}
-  this._blockEnd    = null     // @type {CommentNode}
+  this._isBlock = false
+  this._blockStart =    // @type {CommentNode}
+  this._blockEnd = null // @type {CommentNode}
 
   // lifecycle state
-  this._isCompiled  =
+  this._isCompiled =
   this._isDestroyed =
-  this._isReady     =
-  this._isAttached  =
+  this._isReady =
+  this._isAttached =
   this._isBeingDestroyed = false
-  this._unlinkFn    = null
+  this._unlinkFn = null
 
-  // children
-  this._children = []
-  this._childCtors = {}
-
-  // transcluded components that belong to the parent.
-  // need to keep track of them so that we can call
-  // attached/detached hooks on them.
-  this._transCpnts = []
-  this._host = options._host
+  // context: the scope in which the component was used,
+  // and the scope in which props and contents of this
+  // instance should be compiled in.
+  this._context =
+    options._context ||
+    options._parent
 
   // push self into parent / transclusion host
   if (this.$parent) {
-    this.$parent._children.push(this)
-  }
-  if (this._host) {
-    this._host._transCpnts.push(this)
+    this.$parent.$children.push(this)
   }
 
   // props used in v-repeat diffing

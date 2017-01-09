@@ -42,18 +42,19 @@ function registerCallbacks (vm, action, hash) {
  * @param {Vue} vm
  * @param {String} action
  * @param {String} key
- * @param {*} handler
+ * @param {Function|String|Object} handler
+ * @param {Object} [options]
  */
 
-function register (vm, action, key, handler) {
+function register (vm, action, key, handler, options) {
   var type = typeof handler
   if (type === 'function') {
-    vm[action](key, handler)
+    vm[action](key, handler, options)
   } else if (type === 'string') {
     var methods = vm.$options.methods
     var method = methods && methods[handler]
     if (method) {
-      vm[action](key, method)
+      vm[action](key, method, options)
     } else {
       _.warn(
         'Unknown method: "' + handler + '" when ' +
@@ -61,6 +62,8 @@ function register (vm, action, key, handler) {
         ': "' + key + '".'
       )
     }
+  } else if (handler && type === 'object') {
+    register(vm, action, key, handler.handler, handler)
   }
 }
 
@@ -79,15 +82,12 @@ exports._initDOMHooks = function () {
 
 function onAttached () {
   this._isAttached = true
-  this._children.forEach(callAttach)
-  if (this._transCpnts.length) {
-    this._transCpnts.forEach(callAttach)
-  }
+  this.$children.forEach(callAttach)
 }
 
 /**
  * Iterator to call attached hook
- * 
+ *
  * @param {Vue} child
  */
 
@@ -103,15 +103,12 @@ function callAttach (child) {
 
 function onDetached () {
   this._isAttached = false
-  this._children.forEach(callDetach)
-  if (this._transCpnts.length) {
-    this._transCpnts.forEach(callDetach)
-  }
+  this.$children.forEach(callDetach)
 }
 
 /**
  * Iterator to call detached hook
- * 
+ *
  * @param {Vue} child
  */
 

@@ -46,22 +46,22 @@ if (_.inBrowser) {
             a: 'A'
           }
         },
-        template: '<test testt="{{@test}}" bb="{{@b}}" v-ref="child"></test>',
+        template: '<test testt="{{@test}}" bb="{{@b}}" a="{{@ test.a }}" v-ref="child"></test>',
         components: {
           test: {
-            props: ['testt', 'bb'],
-            template: '{{testt.a}} {{bb}}'
+            props: ['testt', 'bb', 'a'],
+            template: '{{testt.a}} {{bb}} {{a}}'
           }
         }
       })
-      expect(el.firstChild.textContent).toBe('A B')
+      expect(el.firstChild.textContent).toBe('A B A')
       vm.test.a = 'AA'
       vm.b = 'BB'
       _.nextTick(function () {
-        expect(el.firstChild.textContent).toBe('AA BB')
+        expect(el.firstChild.textContent).toBe('AA BB AA')
         vm.test = { a: 'AAA' }
         _.nextTick(function () {
-          expect(el.firstChild.textContent).toBe('AAA BB')
+          expect(el.firstChild.textContent).toBe('AAA BB AAA')
           vm.$data = {
             b: 'BBB',
             test: {
@@ -69,16 +69,21 @@ if (_.inBrowser) {
             }
           }
           _.nextTick(function () {
-            expect(el.firstChild.textContent).toBe('AAAA BBB')
+            expect(el.firstChild.textContent).toBe('AAAA BBB AAAA')
             // test two-way
             vm.$.child.bb = 'B'
             vm.$.child.testt = { a: 'A' }
             _.nextTick(function () {
-              expect(el.firstChild.textContent).toBe('A B')
+              expect(el.firstChild.textContent).toBe('A B A')
               expect(vm.test.a).toBe('A')
               expect(vm.test).toBe(vm.$.child.testt)
               expect(vm.b).toBe('B')
-              done()
+              vm.$.child.a = 'Oops'
+              _.nextTick(function () {
+                expect(el.firstChild.textContent).toBe('Oops B Oops')
+                expect(vm.test.a).toBe('Oops')
+                done()
+              })
             })
           })
         })
@@ -194,7 +199,7 @@ if (_.inBrowser) {
           }
         }
       })
-      var child = vm._children[0]
+      var child = vm.$children[0]
       expect(el.firstChild.textContent).toBe('A B')
       child.aa = 'AA'
       vm.b = 'BB'
@@ -350,6 +355,34 @@ if (_.inBrowser) {
         expect(hasWarned(_, 'Missing required prop')).toBe(true)
       })
 
+    })
+
+    it('alternative syntax', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<test b="{{a}}" c="{{d}}"></test>',
+        data: {
+          a: 'AAA',
+          d: 'DDD'
+        },
+        components: {
+          test: {
+            props: {
+              b: String,
+              c: {
+                type: Number
+              },
+              d: {
+                required: true
+              }
+            },
+            template: '<p>{{b}}</p><p>{{c}}</p>'
+          }
+        }
+      })
+      expect(hasWarned(_, 'Missing required prop')).toBe(true)
+      expect(hasWarned(_, 'Expected Number')).toBe(true)
+      expect(el.textContent).toBe('AAA')
     })
   })
 }

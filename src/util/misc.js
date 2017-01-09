@@ -9,11 +9,8 @@ var config = require('../config')
  */
 
 exports.assertProp = function (prop, value) {
-  var assertions = prop.assertions
-  if (!assertions) {
-    return true
-  }
-  var type = assertions.type
+  var options = prop.options
+  var type = options.type
   var valid = true
   var expectedType
   if (type) {
@@ -48,7 +45,7 @@ exports.assertProp = function (prop, value) {
     )
     return false
   }
-  var validator = assertions.validator
+  var validator = options.validator
   if (validator) {
     if (!validator.call(null, value)) {
       _.warn(
@@ -77,13 +74,12 @@ function formatValue (val) {
  *
  * @param {Element} el
  * @param {Object} options
+ * @param {Boolean} hasAttrs
  * @return {String|undefined}
  */
 
 exports.commonTagRE = /^(div|p|span|img|a|br|ul|ol|li|h1|h2|h3|h4|h5|code|pre)$/
-exports.tableElementsRE = /^caption|colgroup|thead|tfoot|tbody|tr|td|th$/
-
-exports.checkComponent = function (el, options) {
+exports.checkComponent = function (el, options, hasAttrs) {
   var tag = el.tagName.toLowerCase()
   if (tag === 'component') {
     // dynamic syntax
@@ -96,7 +92,7 @@ exports.checkComponent = function (el, options) {
   ) {
     return tag
   } else if (
-    exports.tableElementsRE.test(tag) &&
+    hasAttrs &&
     (tag = _.attr(el, 'component'))
   ) {
     return tag

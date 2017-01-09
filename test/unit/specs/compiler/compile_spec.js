@@ -30,7 +30,7 @@ if (_.inBrowser) {
         $interpolate: function (value) {
           return data[value]
         },
-        $parent: {
+        _context: {
           _directives: [],
           $get: function (v) {
             return 'from parent: ' + v
@@ -156,8 +156,22 @@ if (_.inBrowser) {
         'twoway',
         'with-filter',
         'camelCase',
-        'boolean-literal'
-      ]
+        'boolean-literal',
+        {
+          name: 'default-value',
+          default: 123
+        },
+        {
+          name: 'boolean',
+          type: Boolean
+        },
+        {
+          name: 'boolean-absent',
+          type: Boolean
+        }
+      ].map(function (p) {
+        return typeof p === 'string' ? { name: p } : p
+      })
       var def = Vue.options.directives._prop
       el.setAttribute('a', '1')
       el.setAttribute('data-some-attr', '{{a}}')
@@ -167,6 +181,7 @@ if (_.inBrowser) {
       el.setAttribute('twoway', '{{@a}}')
       el.setAttribute('with-filter', '{{a | filter}}')
       el.setAttribute('boolean-literal', '{{true}}')
+      el.setAttribute('boolean', '')
       compiler.compileAndLinkProps(vm, el, props)
       // should skip literals and one-time bindings
       expect(vm._bindDir.calls.count()).toBe(4)
@@ -204,7 +219,7 @@ if (_.inBrowser) {
       expect(args[3]).toBe(def)
       // literal and one time should've been set on the _data
       // and numbers should be casted
-      expect(Object.keys(vm._data).length).toBe(5)
+      expect(Object.keys(vm._data).length).toBe(8)
       expect(vm.a).toBe(1)
       expect(vm._data.a).toBe(1)
       expect(vm.someOtherAttr).toBe(2)
@@ -214,23 +229,29 @@ if (_.inBrowser) {
       expect(vm.booleanLiteral).toBe('from parent: true')
       expect(vm._data.booleanLiteral).toBe('from parent: true')
       expect(vm._data.camelCase).toBeUndefined()
+      expect(vm._data.defaultValue).toBe(123)
+      expect(vm._data.boolean).toBe(true)
+      expect(vm._data.booleanAbsent).toBe(false)
       // camelCase should've warn
       expect(hasWarned(_, 'using camelCase')).toBe(true)
     })
 
     it('props on root instance', function () {
       // temporarily remove vm.$parent
-      var parent = vm.$parent
-      vm.$parent = null
+      var context = vm._context
+      vm._context = null
       var def = Vue.options.directives._prop
       el.setAttribute('a', 'hi')
       el.setAttribute('b', '{{hi}}')
-      compiler.compileAndLinkProps(vm, el, ['a', 'b'])
+      compiler.compileAndLinkProps(vm, el, [
+        { name: 'a' },
+        { name: 'b' }
+      ])
       expect(vm._bindDir.calls.count()).toBe(0)
       expect(vm._data.a).toBe('hi')
       expect(hasWarned(_, 'Cannot bind dynamic prop on a root')).toBe(true)
       // restore parent mock
-      vm.$parent = parent
+      vm._context = context
     })
 
     it('DocumentFragment', function () {
@@ -308,9 +329,9 @@ if (_.inBrowser) {
           }
         }
       })
-      var dirs = vm._children[0]._directives
+      var dirs = vm.$children[0]._directives
       expect(dirs.length).toBe(2)
-      vm._children[0].$destroy()
+      vm.$children[0].$destroy()
       var i = dirs.length
       while (i--) {
         expect(dirs[i]._bound).toBe(false)
@@ -333,10 +354,10 @@ if (_.inBrowser) {
       })
       expect(el.firstChild.style.display).toBe('')
       expect(vm._directives.length).toBe(2)
-      expect(vm._children.length).toBe(1)
-      vm._children[0].$destroy()
+      expect(vm.$children.length).toBe(1)
+      vm.$children[0].$destroy()
       expect(vm._directives.length).toBe(1)
-      expect(vm._children.length).toBe(0)
+      expect(vm.$children.length).toBe(0)
     })
 
     it('should remove transcluded directives from parent when unlinking (component)', function () {
@@ -355,10 +376,10 @@ if (_.inBrowser) {
       })
       expect(vm.$el.textContent).toBe('parent')
       expect(vm._directives.length).toBe(2)
-      expect(vm._children.length).toBe(1)
-      vm._children[0].$destroy()
+      expect(vm.$children.length).toBe(1)
+      vm.$children[0].$destroy()
       expect(vm._directives.length).toBe(1)
-      expect(vm._children.length).toBe(0)
+      expect(vm.$children.length).toBe(0)
     })
 
     it('should remove transcluded directives from parent when unlinking (v-if + component)', function (done) {
@@ -380,12 +401,12 @@ if (_.inBrowser) {
       })
       expect(vm.$el.textContent).toBe('parent')
       expect(vm._directives.length).toBe(3)
-      expect(vm._children.length).toBe(1)
+      expect(vm.$children.length).toBe(1)
       vm.ok = false
       _.nextTick(function () {
         expect(vm.$el.textContent).toBe('')
         expect(vm._directives.length).toBe(1)
-        expect(vm._children.length).toBe(0)
+        expect(vm.$children.length).toBe(0)
         done()
       })
     })

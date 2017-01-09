@@ -234,11 +234,11 @@ if (_.inBrowser) {
         }
       })
       expect(el.textContent).toBe('')
-      expect(vm._children.length).toBe(0)
+      expect(vm.$children.length).toBe(0)
       expect(vm._directives.length).toBe(1) // v-if
       vm.ok = true
       _.nextTick(function () {
-        expect(vm._children.length).toBe(1)
+        expect(vm.$children.length).toBe(1)
         expect(vm._directives.length).toBe(3) // v-if, v-component, v-text
         expect(el.textContent).toBe('hello world')
         done()
@@ -263,7 +263,22 @@ if (_.inBrowser) {
       expect(el.innerHTML).toBe('<ul><li>1</li><li>2</li></ul>')
     })
 
-    it('wait-for', function (done) {
+    it('wait-for for static component', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<view-a wait-for="ok"></view-a>',
+        components: {
+          'view-a': {
+            template: 'AAA'
+          }
+        }
+      })
+      expect(el.textContent).toBe('')
+      vm.$children[0].$emit('ok')
+      expect(el.textContent).toBe('AAA')
+    })
+
+    it('wait-for for dynamic components', function (done) {
       var vm = new Vue({
         el: el,
         data: {
@@ -279,12 +294,12 @@ if (_.inBrowser) {
           }
         }
       })
-      vm._children[0].$emit('ok')
+      vm.$children[0].$emit('ok')
       vm.view = 'view-b'
       _.nextTick(function () {
         expect(el.textContent).toBe('AAA')
         // old vm is already removed, this is the new vm
-        vm._children[0].$emit('ok')
+        vm.$children[0].$emit('ok')
         expect(el.textContent).toBe('BBB')
         done()
       })
@@ -388,12 +403,12 @@ if (_.inBrowser) {
       })
       vm.view = 'test2'
       _.nextTick(function () {
-        expect(vm._children.length).toBe(2)
-        var child = vm._children[0]
-        var child2 = vm._children[1]
+        expect(vm.$children.length).toBe(2)
+        var child = vm.$children[0]
+        var child2 = vm.$children[1]
         vm._directives[0].unbind()
         expect(vm._directives[0].cache).toBeNull()
-        expect(vm._children.length).toBe(0)
+        expect(vm.$children.length).toBe(0)
         expect(child._isDestroyed).toBe(true)
         expect(child2._isDestroyed).toBe(true)
         done()

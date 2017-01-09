@@ -9,19 +9,19 @@ module.exports = {
 
   bind: function () {
     var vm = this.vm
-    var contentOwner = vm
-    // we need find the content owner, which is the closest
-    // non-inline-repeater instance.
-    while (contentOwner.$options._repeat) {
-      contentOwner = contentOwner.$parent
+    var host = vm
+    // we need find the content context, which is the
+    // closest non-inline-repeater instance.
+    while (host.$options._repeat) {
+      host = host.$parent
     }
-    var raw = contentOwner.$options._content
+    var raw = host.$options._content
     var content
     if (!raw) {
       this.fallback()
       return
     }
-    var parent = contentOwner.$parent
+    var context = host._context
     var selector = this.el.getAttribute('select')
     if (!selector) {
       // Default content
@@ -29,16 +29,16 @@ module.exports = {
       var compileDefaultContent = function () {
         self.compile(
           extractFragment(raw.childNodes, raw, true),
-          contentOwner.$parent,
+          context,
           vm
         )
       }
-      if (!contentOwner._isCompiled) {
+      if (!host._isCompiled) {
         // defer until the end of instance compilation,
         // because the default outlet must wait until all
         // other possible outlets with selectors have picked
         // out their contents.
-        contentOwner.$once('hook:compiled', compileDefaultContent)
+        host.$once('hook:compiled', compileDefaultContent)
       } else {
         compileDefaultContent()
       }
@@ -49,7 +49,7 @@ module.exports = {
       if (nodes.length) {
         content = extractFragment(nodes, raw)
         if (content.hasChildNodes()) {
-          this.compile(content, parent, vm)
+          this.compile(content, context, vm)
         } else {
           this.fallback()
         }
@@ -63,9 +63,9 @@ module.exports = {
     this.compile(_.extractContent(this.el, true), this.vm)
   },
 
-  compile: function (content, owner, host) {
-    if (content && owner) {
-      this.unlink = owner.$compile(content, host)
+  compile: function (content, context, host) {
+    if (content && context) {
+      this.unlink = context.$compile(content, host)
     }
     if (content) {
       _.replace(this.el, content)
@@ -77,7 +77,7 @@ module.exports = {
   unbind: function () {
     if (this.unlink) {
       this.unlink()
-    } 
+    }
   }
 }
 
