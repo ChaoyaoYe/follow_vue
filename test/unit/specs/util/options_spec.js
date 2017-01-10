@@ -7,13 +7,13 @@ describe('Util - Option merging', function () {
   beforeEach(function () {
     spyOn(_, 'warn')
   })
-  
+
   it('default strat', function () {
     // child undefined
-    var res = merge({replace:true}, {}).replace
+    var res = merge({replace: true}, {}).replace
     expect(res).toBe(true)
     // child overwrite
-    res = merge({replace:true}, {replace:false}).replace
+    res = merge({replace: true}, {replace: false}).replace
     expect(res).toBe(false)
   })
 
@@ -48,10 +48,10 @@ describe('Util - Option merging', function () {
   it('events', function () {
 
     // no parent
-    res = merge({}, {events:1})
+    res = merge({}, {events: 1})
     expect(res.events).toBe(1)
     // no child
-    res = merge({events:1}, {})
+    res = merge({events: 1}, {})
     expect(res.events).toBe(1)
 
     var fn1 = function () {}
@@ -74,7 +74,7 @@ describe('Util - Option merging', function () {
     assertRes(res.fn1, [fn1, fn2, fn3])
     assertRes(res.fn2, [fn2, fn3])
     assertRes(res.fn3, [fn3])
-    
+
     function assertRes (res, expected) {
       expect(Array.isArray(res)).toBe(true)
       expect(res.length).toBe(expected.length)
@@ -122,12 +122,12 @@ describe('Util - Option merging', function () {
       }
     })
     expect(typeof res.components.test).toBe('function')
-    expect(res.components.test.options.name).toBe('test')
+    expect(res.components.test.options.id).toBe('test')
     expect(res.components.test.super).toBe(Vue)
   })
 
   it('guard components warn built-in elements', function () {
-    var res = merge({
+    merge({
       components: null
     }, {
       components: {
@@ -138,7 +138,7 @@ describe('Util - Option merging', function () {
   })
 
   it('should ignore non-function el & data in class merge', function () {
-    var res = merge({}, {el:1, data:2})
+    var res = merge({}, {el: 1, data: 2})
     expect(res.el).toBeUndefined()
     expect(res.data).toBeUndefined()
   })
@@ -146,26 +146,26 @@ describe('Util - Option merging', function () {
   it('class el merge', function () {
     function fn1 () {}
     function fn2 () {}
-    var res = merge({el:fn1}, {el:fn2})
+    var res = merge({el: fn1}, {el: fn2})
     expect(res.el).toBe(fn2)
   })
 
   it('class data merge', function () {
     function fn1 () {
-      return { a: 1, c: 4, d: { e: 1 } }
+      return { a: 1, c: 4, d: { e: 1 }}
     }
     function fn2 () {
-      return { a: 2, b: 3, d: { f: 2 } }
+      return { a: 2, b: 3, d: { f: 2 }}
     }
     // both present
-    var res = merge({data:fn1}, {data:fn2}).data()
+    var res = merge({data: fn1}, {data: fn2}).data()
     expect(res.a).toBe(2)
     expect(res.b).toBe(3)
     expect(res.c).toBe(4)
     expect(res.d.e).toBe(1)
     expect(res.d.f).toBe(2)
     // only parent
-    res = merge({data:fn1}, {}).data()
+    res = merge({data: fn1}, {}).data()
     expect(res.a).toBe(1)
     expect(res.b).toBeUndefined()
     expect(res.c).toBe(4)
@@ -184,16 +184,16 @@ describe('Util - Option merging', function () {
       return 2
     }
     // both functions
-    var res = merge({el:fn1}, {el:fn2}, vm)
+    var res = merge({el: fn1}, {el: fn2}, vm)
     expect(res.el).toBe(2)
     // direct instance el
-    res = merge({el:fn1}, {el:2}, vm)
+    res = merge({el: fn1}, {el: 2}, vm)
     expect(res.el).toBe(2)
     // no parent
-    res = merge({}, {el:2}, vm)
+    res = merge({}, {el: 2}, vm)
     expect(res.el).toBe(2)
     // no child
-    res = merge({el:fn1}, {}, vm)
+    res = merge({el: fn1}, {}, vm)
     expect(res.el).toBe(1)
   })
 
@@ -248,7 +248,10 @@ describe('Util - Option merging', function () {
   })
 
   it('mixins', function () {
-    var a = {}, b = {}, c = {}, d = {}
+    var a = {}
+    var b = {}
+    var c = {}
+    var d = {}
     var f1 = function () {}
     var f2 = function () {}
     var f3 = function () {}
@@ -269,6 +272,34 @@ describe('Util - Option merging', function () {
     expect(res.created[1]).toBe(f2)
     expect(res.created[2]).toBe(f3)
     expect(res.created[3]).toBe(f4)
+  })
+
+  it('Array assets', function () {
+    var a = {
+      components: {
+        a: Vue.extend({})
+      }
+    }
+    var b = {
+      components: [{ id: 'b' }]
+    }
+    var res = merge(a, b)
+    expect(res.components.a).toBe(a.components.a)
+    // b.components is guarded and converted to object hash
+    expect(res.components.b).toBe(b.components.b)
+  })
+
+  it('warn Array assets without id', function () {
+    var a = {
+      components: {
+        a: Vue.extend({})
+      }
+    }
+    var b = {
+      components: [{}]
+    }
+    merge(a, b)
+    expect(hasWarned(_, 'must provide an id')).toBe(true)
   })
 
 })

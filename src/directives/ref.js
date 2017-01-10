@@ -7,7 +7,7 @@ module.exports = {
   bind: function () {
     var vm = this.el.__vue__
     if (!vm) {
-      _.warn(
+      process.env.NODE_ENV !== 'production' && _.warn(
         'v-ref should only be used on a component root element.'
       )
       return
@@ -19,5 +19,4 @@ module.exports = {
     // if any.
     vm._refID = this.expression
   }
-  
 }

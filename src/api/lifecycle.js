@@ -13,7 +13,9 @@ var compiler = require('../compiler')
 
 exports.$mount = function (el) {
   if (this._isCompiled) {
-    _.warn('$mount() should be called only once.')
+    process.env.NODE_ENV !== 'production' && _.warn(
+      '$mount() should be called only once.'
+    )
     return
   }
   el = _.query(el)
@@ -23,12 +25,11 @@ exports.$mount = function (el) {
   this._compile(el)
   this._isCompiled = true
   this._callHook('compiled')
+  this._initDOMHooks()
   if (_.inDoc(this.$el)) {
     this._callHook('attached')
-    this._initDOMHooks()
     ready.call(this)
   } else {
-    this._initDOMHooks()
     this.$once('hook:attached', ready)
   }
   return this

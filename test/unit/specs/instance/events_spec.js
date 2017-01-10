@@ -26,7 +26,7 @@ describe('Instance Events', function () {
     })
 
     it('hook events', function () {
-      var vm = new Vue({
+      new Vue({
         events: {
           'hook:created': spy
         }
@@ -118,7 +118,7 @@ describe('Instance Events', function () {
   })
 
   describe('hooks', function () {
-    
+
     it('created', function () {
       var ctx
       var vm = new Vue({
@@ -152,7 +152,6 @@ describe('Instance Events', function () {
         destroyed: function () {
           expect(this).toBe(vm)
           expect(this._isDestroyed).toBe(true)
-          expect(this._data).toBeNull()
           spy()
         }
       })

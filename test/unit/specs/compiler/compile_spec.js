@@ -3,7 +3,6 @@ var _ = require('../../../../src/util')
 var dirParser = require('../../../../src/parsers/directive')
 var compiler = require('../../../../src/compiler')
 var compile = compiler.compile
-var transclude = compiler.transclude
 
 if (_.inBrowser) {
   describe('Compile', function () {
@@ -168,7 +167,17 @@ if (_.inBrowser) {
         {
           name: 'boolean-absent',
           type: Boolean
-        }
+        },
+        {
+          name: 'factory',
+          type: Object,
+          default: function () {
+            return {
+              a: 123
+            }
+          }
+        },
+        'withDataPrefix'
       ].map(function (p) {
         return typeof p === 'string' ? { name: p } : p
       })
@@ -180,8 +189,10 @@ if (_.inBrowser) {
       el.setAttribute('onetime', '{{*a}}')
       el.setAttribute('twoway', '{{@a}}')
       el.setAttribute('with-filter', '{{a | filter}}')
+      el.setAttribute('camel-case', 'hi')
       el.setAttribute('boolean-literal', '{{true}}')
       el.setAttribute('boolean', '')
+      el.setAttribute('data-with-data-prefix', '1')
       compiler.compileAndLinkProps(vm, el, props)
       // should skip literals and one-time bindings
       expect(vm._bindDir.calls.count()).toBe(4)
@@ -219,7 +230,7 @@ if (_.inBrowser) {
       expect(args[3]).toBe(def)
       // literal and one time should've been set on the _data
       // and numbers should be casted
-      expect(Object.keys(vm._data).length).toBe(8)
+      expect(Object.keys(vm._data).length).toBe(10)
       expect(vm.a).toBe(1)
       expect(vm._data.a).toBe(1)
       expect(vm.someOtherAttr).toBe(2)
@@ -228,19 +239,24 @@ if (_.inBrowser) {
       expect(vm._data.onetime).toBe('from parent: a')
       expect(vm.booleanLiteral).toBe('from parent: true')
       expect(vm._data.booleanLiteral).toBe('from parent: true')
-      expect(vm._data.camelCase).toBeUndefined()
+      expect(vm.camelCase).toBe('hi')
+      expect(vm._data.camelCase).toBe('hi')
+      expect(vm.defaultValue).toBe(123)
       expect(vm._data.defaultValue).toBe(123)
+      expect(vm.boolean).toBe(true)
       expect(vm._data.boolean).toBe(true)
+      expect(vm.booleanAbsent).toBe(false)
       expect(vm._data.booleanAbsent).toBe(false)
-      // camelCase should've warn
-      expect(hasWarned(_, 'using camelCase')).toBe(true)
+      expect(vm.factory).toBe(vm._data.factory)
+      expect(vm.factory.a).toBe(123)
+      expect(vm.withDataPrefix).toBe(1)
+      expect(vm._data.withDataPrefix).toBe(1)
     })
 
     it('props on root instance', function () {
       // temporarily remove vm.$parent
       var context = vm._context
       vm._context = null
-      var def = Vue.options.directives._prop
       el.setAttribute('a', 'hi')
       el.setAttribute('b', '{{hi}}')
       compiler.compileAndLinkProps(vm, el, [
@@ -412,7 +428,7 @@ if (_.inBrowser) {
     })
 
     it('element directive', function () {
-      var vm = new Vue({
+      new Vue({
         el: el,
         template: '<test>{{a}}</test>',
         elementDirectives: {

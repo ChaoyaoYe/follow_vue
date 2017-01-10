@@ -56,7 +56,7 @@ function register (vm, action, key, handler, options) {
     if (method) {
       vm[action](key, method, options)
     } else {
-      _.warn(
+      process.env.NODE_ENV !== 'production' && _.warn(
         'Unknown method: "' + handler + '" when ' +
         'registering callback for ' + action +
         ': "' + key + '".'
@@ -81,8 +81,10 @@ exports._initDOMHooks = function () {
  */
 
 function onAttached () {
-  this._isAttached = true
-  this.$children.forEach(callAttach)
+  if (!this._isAttached) {
+    this._isAttached = true
+    this.$children.forEach(callAttach)
+  }
 }
 
 /**
@@ -102,8 +104,10 @@ function callAttach (child) {
  */
 
 function onDetached () {
-  this._isAttached = false
-  this.$children.forEach(callDetach)
+  if (this._isAttached) {
+    this._isAttached = false
+    this.$children.forEach(callDetach)
+  }
 }
 
 /**

@@ -29,6 +29,12 @@ describe('Util - Language Enhancement', function () {
     expect(_.camelize('some-long-name')).toBe('someLongName')
   })
 
+  it('hyphenate', function () {
+    expect(_.hyphenate('whatsUp')).toBe('whats-up')
+    expect(_.hyphenate('a1BfC')).toBe('a1-bf-c')
+    expect(_.hyphenate('already-With-Hyphen')).toBe('already-with-hyphen')
+  })
+
   it('classify', function () {
     expect(_.classify('abc')).toBe('Abc')
     expect(_.classify('some-long-name')).toBe('SomeLongName')
@@ -45,10 +51,10 @@ describe('Util - Language Enhancement', function () {
     var res = bound('arg a')
     expect(res).toBe('ctx a arg a')
   })
-  
+
   it('toArray', function () {
     // should make a copy of original array
-    var arr = [1,2,3]
+    var arr = [1, 2, 3]
     var res = _.toArray(arr)
     expect(Array.isArray(res)).toBe(true)
     expect(res.toString()).toEqual('1,2,3')
@@ -59,11 +65,11 @@ describe('Util - Language Enhancement', function () {
       var res = _.toArray(arguments)
       expect(Array.isArray(res)).toBe(true)
       expect(res.toString()).toEqual('1,2,3')
-    })(1,2,3)
+    })(1, 2, 3)
   })
 
   it('extend', function () {
-    var from = {a:1,b:2}
+    var from = {a: 1, b: 2}
     var to = {}
     var res = _.extend(to, from)
     expect(to.a).toBe(from.a)
@@ -79,7 +85,7 @@ describe('Util - Language Enhancement', function () {
     expect(_.isObject(true)).toBeFalsy()
     expect(_.isObject('hi')).toBeFalsy()
     expect(_.isObject(undefined)).toBeFalsy()
-    expect(_.isObject(function(){})).toBeFalsy()
+    expect(_.isObject(function () {})).toBeFalsy()
   })
 
   it('isPlainObject', function () {
@@ -91,7 +97,7 @@ describe('Util - Language Enhancement', function () {
     expect(_.isPlainObject(true)).toBeFalsy()
     expect(_.isPlainObject('hi')).toBeFalsy()
     expect(_.isPlainObject(undefined)).toBeFalsy()
-    expect(_.isPlainObject(function(){})).toBe(false)
+    expect(_.isPlainObject(function () {})).toBe(false)
     if (_.inBrowser) {
       expect(_.isPlainObject(window)).toBe(false)
     }

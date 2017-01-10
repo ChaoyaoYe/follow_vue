@@ -28,7 +28,7 @@ exports._initProps = function () {
   var el = options.el
   var props = options.props
   if (props && !el) {
-    _.warn(
+    process.env.NODE_ENV !== 'production' && _.warn(
       'Props will not be compiled if no `el` option is ' +
       'provided at instantiation.'
     )
@@ -53,10 +53,7 @@ exports._initData = function () {
   if (optionsData) {
     this._data = optionsData
     for (var prop in propsData) {
-      if (
-        !optionsData.hasOwnProperty(prop) ||
-        propsData[prop] !== undefined
-      ) {
+      if (this._props[prop].raw !== null) {
         optionsData.$set(prop, propsData[prop])
       }
     }
@@ -73,7 +70,7 @@ exports._initData = function () {
     }
   }
   // observe data
-  Observer.create(data).addVm(this)
+  Observer.create(data, this)
 }
 
 /**
@@ -121,7 +118,7 @@ exports._setData = function (newData) {
     }
   }
   oldData.__ob__.removeVm(this)
-  Observer.create(newData).addVm(this)
+  Observer.create(newData, this)
   this._digest()
 }
 
@@ -166,7 +163,7 @@ exports._unproxy = function (key) {
 exports._digest = function () {
   var i = this._watchers.length
   while (i--) {
-    this._watchers[i].update()
+    this._watchers[i].update(true) // shallow updates
   }
   var children = this.$children
   i = children.length

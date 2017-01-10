@@ -7,7 +7,7 @@ if (_.inBrowser) {
     var el, dir
     beforeEach(function () {
       el = document.createElement('div')
-      dir = {el:el}
+      dir = {el: el}
       _.extend(dir, def)
     })
 
@@ -26,6 +26,14 @@ if (_.inBrowser) {
       expect(el.getAttribute('test')).toBe('0')
     })
 
+    it('should set property', function () {
+      dir.el = document.createElement('input')
+      dir.arg = 'value'
+      dir.update('what')
+      expect(dir.el.getAttribute('value')).toBe('what')
+      expect(dir.el.value).toBe('what')
+    })
+
     it('xlink', function () {
       var xlinkNS = 'http://www.w3.org/1999/xlink'
       dir.arg = 'xlink:special'
@@ -40,8 +48,8 @@ if (_.inBrowser) {
 
     it('object and xlink', function () {
       var xlinkNS = 'http://www.w3.org/1999/xlink'
-      var obj1 = {special:'ok', test:'again'}
-      var obj2 = {'xlink:href': '#', test: 'ok', empty:null}
+      var obj1 = {special: 'ok', test: 'again'}
+      var obj2 = {'xlink:href': '#', test: 'ok', empty: null}
       dir.update(obj2)
       expect(el.getAttributeNS(xlinkNS, 'href')).toBe('#')
       expect(el.getAttribute('test')).toBe('ok')

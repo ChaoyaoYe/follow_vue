@@ -72,26 +72,31 @@ exports.stripQuotes = function (str) {
 }
 
 /**
- * Replace helper
- *
- * @param {String} _ - matched delimiter
- * @param {String} c - matched char
- * @return {String}
- */
-function toUpper (_, c) {
-  return c ? c.toUpperCase () : ''
-}
-
-/**
  * Camelize a hyphen-delmited string.
  *
  * @param {String} str
  * @return {String}
  */
 
-var camelRE = /-(\w)/g
 exports.camelize = function (str) {
-  return str.replace(camelRE, toUpper)
+  return str.replace(/-(\w)/g, toUpper)
+}
+
+function toUpper (_, c) {
+  return c ? c.toUpperCase() : ''
+}
+
+/**
+ * Hyphenate a camelCase string.
+ *
+ * @param {String} str
+ * @return {String}
+ */
+
+exports.hyphenate = function (str) {
+  return str
+    .replace(/([a-z\d])([A-Z])/g, '$1-$2')
+    .toLowerCase()
 }
 
 /**
@@ -208,10 +213,10 @@ exports.isArray = Array.isArray
 
 exports.define = function (obj, key, val, enumerable) {
   Object.defineProperty(obj, key, {
-    value        : val,
-    enumerable   : !!enumerable,
-    writable     : true,
-    configurable : true
+    value: val,
+    enumerable: !!enumerable,
+    writable: true,
+    configurable: true
   })
 }
 
@@ -224,9 +229,9 @@ exports.define = function (obj, key, val, enumerable) {
  * @return {Function} - the debounced function
  */
 
-exports.debounce = function(func, wait) {
+exports.debounce = function (func, wait) {
   var timeout, args, context, timestamp, result
-  var later = function() {
+  var later = function () {
     var last = Date.now() - timestamp
     if (last < wait && last >= 0) {
       timeout = setTimeout(later, wait - last)
@@ -236,7 +241,7 @@ exports.debounce = function(func, wait) {
       if (!timeout) context = args = null
     }
   }
-  return function() {
+  return function () {
     context = this
     args = arguments
     timestamp = Date.now()

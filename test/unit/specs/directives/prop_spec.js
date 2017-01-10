@@ -165,7 +165,7 @@ if (_.inBrowser) {
     })
 
     it('warn invalid keys', function () {
-      var vm = new Vue({
+      new Vue({
         el: el,
         template: '<test a.b.c="{{test}}"></test>',
         components: {
@@ -178,10 +178,28 @@ if (_.inBrowser) {
     })
 
     it('warn props with no el option', function () {
-      var vm = new Vue({
+      new Vue({
         props: ['a']
       })
       expect(hasWarned(_, 'Props will not be compiled if no `el`')).toBe(true)
+    })
+
+    it('warn object/array default values', function () {
+      new Vue({
+        el: el,
+        props: {
+          arr: {
+            type: Array,
+            default: []
+          },
+          obj: {
+            type: Object,
+            default: {}
+          }
+        }
+      })
+      expect(hasWarned(_, 'Use a factory function to return the default value')).toBe(true)
+      expect(_.warn.calls.count()).toBe(2)
     })
 
     it('teardown', function (done) {
@@ -220,7 +238,7 @@ if (_.inBrowser) {
     })
 
     it('block instance with replace:true', function () {
-      var vm = new Vue({
+      new Vue({
         el: el,
         template: '<test b="{{a}}" c="{{d}}"></test>',
         data: {
@@ -338,7 +356,7 @@ if (_.inBrowser) {
       })
 
       it('required', function () {
-        var vm = new Vue({
+        new Vue({
           el: document.createElement('div'),
           template: '<test></test>',
           components: {
@@ -358,7 +376,7 @@ if (_.inBrowser) {
     })
 
     it('alternative syntax', function () {
-      var vm = new Vue({
+      new Vue({
         el: el,
         template: '<test b="{{a}}" c="{{d}}"></test>',
         data: {
@@ -383,6 +401,47 @@ if (_.inBrowser) {
       expect(hasWarned(_, 'Missing required prop')).toBe(true)
       expect(hasWarned(_, 'Expected Number')).toBe(true)
       expect(el.textContent).toBe('AAA')
+    })
+
+    it('should not overwrite inherit:true properties', function () {
+      var vm = new Vue({
+        el: el,
+        data: {
+          msg: 'hi!'
+        },
+        template: '<test msg="ho!"></test>',
+        components: {
+          test: {
+            props: ['msg'],
+            inherit: true,
+            template: '{{msg}}'
+          }
+        }
+      })
+      expect(vm.msg).toBe('hi!')
+      expect(el.textContent).toBe('ho!')
+    })
+
+    it('should not overwrite default value for an absent Boolean prop', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<test></test>',
+        components: {
+          test: {
+            props: {
+              prop: Boolean
+            },
+            data: function () {
+              return {
+                prop: true
+              }
+            },
+            template: '{{prop}}'
+          }
+        }
+      })
+      expect(vm.$children[0].prop).toBe(true)
+      expect(vm.$el.textContent).toBe('true')
     })
   })
 }

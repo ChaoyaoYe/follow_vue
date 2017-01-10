@@ -48,6 +48,9 @@ function Watcher (vm, expOrFn, cb, options) {
     this.setter = res.set
   }
   this.value = this.get()
+  // state for avoiding false triggers for deep and Array
+  // watchers during vm._digest()
+  this.queued = this.shallow = false
 }
 
 var p = Watcher.prototype
@@ -83,7 +86,10 @@ p.get = function () {
   try {
     value = this.getter.call(vm, vm)
   } catch (e) {
-    if (config.warnExpressionErrors) {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      config.warnExpressionErrors
+    ) {
       _.warn(
         'Error when evaluating expression "' +
         this.expression + '". ' +
@@ -124,7 +130,10 @@ p.set = function (value) {
   try {
     this.setter.call(vm, vm, value)
   } catch (e) {
-    if (config.warnExpressionErrors) {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      config.warnExpressionErrors
+    ) {
       _.warn(
         'Error when evaluating setter "' +
         this.expression + '"', e
@@ -161,12 +170,22 @@ p.afterGet = function () {
 /**
  * Subscriber interface.
  * Will be called when a dependency changes.
+ *
+ * @param {Boolean} shallow
  */
 
-p.update = function () {
+p.update = function (shallow) {
   if (!config.async) {
     this.run()
   } else {
+    // if queued, only overwrite shallow with non-shallow,
+    // but not the other way around.
+    this.shallow = this.queued
+      ? shallow
+        ? this.shallow
+        : false
+      : !!shallow
+    this.queued = true
     batcher.push(this)
   }
 }
@@ -181,13 +200,17 @@ p.run = function () {
     var value = this.get()
     if (
       value !== this.value ||
-      _.isArray(value) ||
-      this.deep
+      // Deep watchers and Array watchers should fire even
+      // when the value is the same, because the value may
+      // have mutated; but only do so if this is a
+      // non-shallow update (caused by a vm digest).
+      ((_.isArray(value) || this.deep) && !this.shallow)
     ) {
       var oldValue = this.value
       this.value = value
       this.cb(value, oldValue)
     }
+    this.queued = this.shallow = false
   }
 }
 
@@ -211,7 +234,6 @@ p.teardown = function () {
     this.vm = this.cb = this.value = null
   }
 }
-
 
 /**
  * Recrusively traverse an object to evoke all converted

@@ -1,5 +1,5 @@
-casper.test.begin('markdown', 4, function (test) {
-  
+casper.test.begin('markdown', 5, function (test) {
+
   casper
   .start('../../examples/markdown/index.html')
   .then(function () {
@@ -21,9 +21,18 @@ casper.test.begin('markdown', 4, function (test) {
     // keyUp(13)
   })
   .then(function () {
+    // assert the output is not updarted yet because of
+    // debounce
     test.assertEval(function () {
-      return document.querySelector('textarea').value
-        === '## yo\n\n- test\n- hi\n\n# hello'
+      return document.querySelector('#editor div')
+        .innerHTML === '<h1 id="hello">hello</h1>\n'
+    })
+  })
+  .wait(300) // wait for debounce
+  .then(function () {
+    test.assertEval(function () {
+      return document.querySelector('textarea').value ===
+        '## yo\n\n- test\n- hi\n\n# hello'
     })
     test.assertEval(function () {
       return document.querySelector('#editor div')
