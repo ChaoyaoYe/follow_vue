@@ -24,7 +24,7 @@ exports.transclude = function (el, options) {
     options._containerAttrs = extractAttrs(el)
   }
   // for template tags, what we want is its content as
-  // a documentFragment (for block instances)
+  // a documentFragment (for fragment instances)
   if (_.isTemplate(el)) {
     el = templateParser.parse(el)
   }
@@ -38,7 +38,7 @@ exports.transclude = function (el, options) {
     }
   }
   if (el instanceof DocumentFragment) {
-    // anchors for block instance
+    // anchors for fragment instance
     // passing in `persist: true` to avoid them being
     // discarded by IE during template cloning
     _.prepend(_.createAnchor('v-start', true), el)
@@ -71,17 +71,21 @@ function transcludeTemplate (el, options) {
           'should probably use `replace: false` here.'
         )
       }
+      // there are many cases where the instance must
+      // become a fragment instance: basically anything that
+      // can create more than 1 root nodes.
       if (
         // multi-children template
         frag.childNodes.length > 1 ||
         // non-element template
         replacer.nodeType !== 1 ||
-        // when root node is <component>, is an element
-        // directive, or has v-repeat, the instance could
-        // end up having multiple top-level nodes, thus
-        // becoming a block instance.
+        // single nested component
         tag === 'component' ||
+        _.resolveAsset(options, 'components', tag) ||
+        replacer.hasAttribute(config.prefix + 'component') ||
+        // element directive
         _.resolveAsset(options, 'elementDirectives', tag) ||
+        // repeat block
         replacer.hasAttribute(config.prefix + 'repeat')
       ) {
         return frag
@@ -102,22 +106,16 @@ function transcludeTemplate (el, options) {
 }
 
 /**
- * Helper to extract a component container's attribute names
- * into a map.
+ * Helper to extract a component container's attributes
+ * into a plain object array.
  *
  * @param {Element} el
- * @return {Object}
+ * @return {Array}
  */
 
 function extractAttrs (el) {
   if (el.nodeType === 1 && el.hasAttributes()) {
-    var attrs = el.attributes
-    var res = {}
-    var i = attrs.length
-    while (i--) {
-      res[attrs[i].name] = attrs[i].value
-    }
-    return res
+    return _.toArray(el.attributes)
   }
 }
 
@@ -139,7 +137,8 @@ function mergeAttrs (from, to) {
     if (!to.hasAttribute(name)) {
       to.setAttribute(name, value)
     } else if (name === 'class') {
-      to.className = to.className + ' ' + value
+      value = to.getAttribute(name) + ' ' + value
+      to.setAttribute(name, value)
     }
   }
 }

@@ -45,6 +45,7 @@ describe('Path Parser', function () {
     assertPath('foo["b\\"az"]', ['foo', 'b"az'])
     assertPath("foo['b\\'az']", ['foo', "b'az"])
     assertPath('a[b][c]', ['a', '*b', '*c'])
+    assertPath('a[ b ][ c ]', ['a', '*b', '*c'])
   })
 
   it('handle invalid paths', function () {
@@ -66,6 +67,7 @@ describe('Path Parser', function () {
     assertInvalidPath('foo["bar]')
     assertInvalidPath("foo['bar]")
     assertInvalidPath('foo[bar + boo]')
+    assertInvalidPath('a]')
   })
 
   it('caching', function () {

@@ -146,7 +146,7 @@ exports.compileAndLinkProps = function (vm, el, props) {
  * 2. attrs on the component template root node, if
  *    replace:true (child scope)
  *
- * If this is a block instance, we only need to compile 1.
+ * If this is a fragment instance, we only need to compile 1.
  *
  * This function does compile and link at the same time,
  * since root linkers can not be reused. It returns the
@@ -165,7 +165,7 @@ exports.compileAndLinkRoot = function (vm, el, options) {
   var contextLinkFn, replacerLinkFn
 
   // only need to compile other attributes for
-  // non-block instances
+  // non-fragment instances
   if (el.nodeType !== 11) {
     // for components, container and replacer need to be
     // compiled separately and linked in different scopes.
@@ -180,7 +180,7 @@ exports.compileAndLinkRoot = function (vm, el, options) {
       }
     } else {
       // non-component, just compile as a normal element.
-      replacerLinkFn = compileDirectives(el, options)
+      replacerLinkFn = compileDirectives(el.attributes, options)
     }
   }
 
@@ -248,7 +248,7 @@ function compileElement (el, options) {
   }
   // normal directives
   if (!linkFn && hasAttrs) {
-    linkFn = compileDirectives(el, options)
+    linkFn = compileDirectives(el.attributes, options)
   }
   // if the element is a textarea, we need to interpolate
   // its content on initial render.
@@ -501,17 +501,12 @@ function makeTerminalNodeLinkFn (el, dirName, value, options, def) {
 /**
  * Compile the directives on an element and return a linker.
  *
- * @param {Element|Object} elOrAttrs
- *        - could be an object of already-extracted
- *          container attributes.
+ * @param {Array|NamedNodeMap} attrs
  * @param {Object} options
  * @return {Function}
  */
 
-function compileDirectives (elOrAttrs, options) {
-  var attrs = _.isPlainObject(elOrAttrs)
-    ? mapToList(elOrAttrs)
-    : elOrAttrs.attributes
+function compileDirectives (attrs, options) {
   var i = attrs.length
   var dirs = []
   var attr, name, value, dir, dirName, dirDef
@@ -547,24 +542,6 @@ function compileDirectives (elOrAttrs, options) {
 }
 
 /**
- * Convert a map (Object) of attributes to an Array.
- *
- * @param {Object} map
- * @return {Array}
- */
-
-function mapToList (map) {
-  var list = []
-  for (var key in map) {
-    list.push({
-      name: key,
-      value: map[key]
-    })
-  }
-  return list
-}
-
-/**
  * Build a link function for all directives on a single node.
  *
  * @param {Array} directives
@@ -596,6 +573,10 @@ function makeNodeLinkFn (directives) {
  * Check an attribute for potential dynamic bindings,
  * and return a directive object.
  *
+ * Special case: class interpolations are translated into
+ * v-class instead v-attr, so that it can work with user
+ * provided v-class bindings.
+ *
  * @param {String} name
  * @param {String} value
  * @param {Object} options
@@ -604,8 +585,10 @@ function makeNodeLinkFn (directives) {
 
 function collectAttrDirective (name, value, options) {
   var tokens = textParser.parse(value)
+  var isClass = name === 'class'
   if (tokens) {
-    var def = options.directives.attr
+    var dirName = isClass ? 'class' : 'attr'
+    var def = options.directives[dirName]
     var i = tokens.length
     var allOneTime = true
     while (i--) {
@@ -621,9 +604,14 @@ function collectAttrDirective (name, value, options) {
             el.setAttribute(name, vm.$interpolate(value))
           }
         : function (vm, el) {
-            var value = textParser.tokensToExp(tokens, vm)
-            var desc = dirParser.parse(name + ':' + value)[0]
-            vm._bindDir('attr', el, desc, def)
+            var exp = textParser.tokensToExp(tokens, vm)
+            var desc = isClass
+              ? dirParser.parse(exp)[0]
+              : dirParser.parse(name + ':' + exp)[0]
+            if (isClass) {
+              desc._rawClass = value
+            }
+            vm._bindDir(dirName, el, desc, def)
           }
     }
   }

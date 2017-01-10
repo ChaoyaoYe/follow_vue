@@ -1,4 +1,5 @@
 var _ = require('../util')
+var config = require('../config')
 var isObject = _.isObject
 var isPlainObject = _.isPlainObject
 var textParser = require('../parsers/text')
@@ -20,31 +21,57 @@ module.exports = {
    */
 
   bind: function () {
+    // support for item in array syntax
+    var inMatch = this.expression.match(/(.*) in (.*)/)
+    if (inMatch) {
+      this.arg = inMatch[1]
+      this._watcherExp = inMatch[2]
+    }
     // uid as a cache identifier
     this.id = '__v_repeat_' + (++uid)
+
     // setup anchor nodes
     this.start = _.createAnchor('v-repeat-start')
     this.end = _.createAnchor('v-repeat-end')
     _.replace(this.el, this.end)
     _.before(this.start, this.end)
+
     // check if this is a block repeat
     this.template = _.isTemplate(this.el)
       ? templateParser.parse(this.el, true)
       : this.el
-    // check other directives that need to be handled
-    // at v-repeat level
-    this.checkIf()
-    this.checkRef()
-    this.checkComponent()
+
     // check for trackby param
-    this.idKey =
-      this._checkParam('track-by') ||
-      this._checkParam('trackby') // 0.11.0 compat
+    this.idKey = this._checkParam('track-by')
     // check for transition stagger
     var stagger = +this._checkParam('stagger')
     this.enterStagger = +this._checkParam('enter-stagger') || stagger
     this.leaveStagger = +this._checkParam('leave-stagger') || stagger
+
+    // check for v-ref/v-el
+    this.refID = this._checkParam(config.prefix + 'ref')
+    this.elID = this._checkParam(config.prefix + 'el')
+
+    // check other directives that need to be handled
+    // at v-repeat level
+    this.checkIf()
+    this.checkComponent()
+
+    // create cache object
     this.cache = Object.create(null)
+
+    // some helpful tips...
+    /* istanbul ignore if */
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      this.el.tagName === 'OPTION'
+    ) {
+      _.warn(
+        'Don\'t use v-repeat for v-model options; ' +
+        'use the `options` param instead: ' +
+        'http://vuejs.org/guide/forms.html#Dynamic_Select_Options'
+      )
+    }
   },
 
   /**
@@ -61,21 +88,6 @@ module.exports = {
   },
 
   /**
-   * Check if v-ref/ v-el is also present.
-   */
-
-  checkRef: function () {
-    var refID = _.attr(this.el, 'ref')
-    this.refID = refID
-      ? this.vm.$interpolate(refID)
-      : null
-    var elId = _.attr(this.el, 'el')
-    this.elId = elId
-      ? this.vm.$interpolate(elId)
-      : null
-  },
-
-  /**
    * Check the component constructor to use for repeated
    * instances. If static we resolve it now, otherwise it
    * needs to be resolved at build time with actual data.
@@ -87,9 +99,9 @@ module.exports = {
     var id = _.checkComponent(this.el, options)
     if (!id) {
       // default constructor
-      this.Ctor = _.Vue
+      this.Component = _.Vue
       // inline repeats should inherit
-      this.inherit = true
+      this.inline = true
       // important: transclude with no options, just
       // to ensure block start and block end
       this.template = compiler.transclude(this.template)
@@ -97,7 +109,7 @@ module.exports = {
       copy._asComponent = false
       this._linkFn = compiler.compile(this.template, copy)
     } else {
-      this.Ctor = null
+      this.Component = null
       this.asComponent = true
       // check inline-template
       if (this._checkParam('inline-template') !== null) {
@@ -107,8 +119,8 @@ module.exports = {
       var tokens = textParser.parse(id)
       if (tokens) {
         // dynamic component to be resolved later
-        var ctorExp = textParser.tokensToExp(tokens)
-        this.ctorGetter = expParser.parse(ctorExp).get
+        var componentExp = textParser.tokensToExp(tokens)
+        this.componentGetter = expParser.parse(componentExp).get
       } else {
         // static
         this.componentId = id
@@ -119,11 +131,11 @@ module.exports = {
 
   resolveComponent: function () {
     this.componentState = PENDING
-    this.vm._resolveComponent(this.componentId, _.bind(function (Ctor) {
+    this.vm._resolveComponent(this.componentId, _.bind(function (Component) {
       if (this.componentState === ABORTED) {
         return
       }
-      this.Ctor = Ctor
+      this.Component = Component
       this.componentState = RESOLVED
       this.realUpdate(this.pendingData)
       this.pendingData = null
@@ -153,19 +165,19 @@ module.exports = {
     for (key in meta) {
       _.define(context, key, meta[key])
     }
-    var id = this.ctorGetter.call(context, context)
-    var Ctor = _.resolveAsset(this.vm.$options, 'components', id)
+    var id = this.componentGetter.call(context, context)
+    var Component = _.resolveAsset(this.vm.$options, 'components', id)
     if (process.env.NODE_ENV !== 'production') {
-      _.assertAsset(Ctor, 'component', id)
+      _.assertAsset(Component, 'component', id)
     }
-    if (!Ctor.options) {
+    if (!Component.options) {
       process.env.NODE_ENV !== 'production' && _.warn(
         'Async resolution is not supported for v-repeat ' +
         '+ dynamic component. (component: ' + id + ')'
       )
       return _.Vue
     }
-    return Ctor
+    return Component
   },
 
   /**
@@ -208,8 +220,8 @@ module.exports = {
         ? toRefObject(this.vms)
         : this.vms
     }
-    if (this.elId) {
-      this.vm.$$[this.elId] = this.vms.map(function (vm) {
+    if (this.elID) {
+      this.vm.$$[this.elID] = this.vms.map(function (vm) {
         return vm.$el
       })
     }
@@ -303,7 +315,7 @@ module.exports = {
       prevEl = targetPrev
         ? targetPrev._staggerCb
           ? targetPrev._staggerAnchor
-          : targetPrev._blockEnd || targetPrev.$el
+          : targetPrev._fragmentEnd || targetPrev.$el
         : start
       if (vm._reused && !vm._staggerCb) {
         currentPrev = findPrevVm(vm, start, this.id)
@@ -347,28 +359,28 @@ module.exports = {
       data = raw
     }
     // resolve constructor
-    var Ctor = this.Ctor || this.resolveDynamicComponent(data, meta)
+    var Component = this.Component || this.resolveDynamicComponent(data, meta)
     var parent = this._host || this.vm
     var vm = parent.$addChild({
       el: templateParser.clone(this.template),
       data: data,
-      inherit: this.inherit,
+      inherit: this.inline,
       template: this.inlineTemplate,
       // repeater meta, e.g. $index, $key
       _meta: meta,
       // mark this as an inline-repeat instance
-      _repeat: this.inherit,
+      _repeat: this.inline,
       // is this a component?
       _asComponent: this.asComponent,
       // linker cachable if no inline-template
-      _linkerCachable: !this.inlineTemplate && Ctor !== _.Vue,
+      _linkerCachable: !this.inlineTemplate && Component !== _.Vue,
       // pre-compiled linker for simple repeats
       _linkFn: this._linkFn,
       // identifier, shows that this vm belongs to this collection
       _repeatId: this.id,
       // transclusion content owner
       _context: this.vm
-    }, Ctor)
+    }, Component)
     // cache instance
     if (needCache) {
       this.cacheVm(raw, vm, index, this.converted ? meta.$key : null)
@@ -525,48 +537,6 @@ module.exports = {
   },
 
   /**
-   * Pre-process the value before piping it through the
-   * filters, and convert non-Array objects to arrays.
-   *
-   * This function will be bound to this directive instance
-   * and passed into the watcher.
-   *
-   * @param {*} value
-   * @return {Array}
-   * @private
-   */
-
-  _preProcess: function (value) {
-    // regardless of type, store the un-filtered raw value.
-    this.rawValue = value
-    var type = this.rawType = typeof value
-    if (!isPlainObject(value)) {
-      this.converted = false
-      if (type === 'number') {
-        value = range(value)
-      } else if (type === 'string') {
-        value = _.toArray(value)
-      }
-      return value || []
-    } else {
-      // convert plain object to array.
-      var keys = Object.keys(value)
-      var i = keys.length
-      var res = new Array(i)
-      var key
-      while (i--) {
-        key = keys[i]
-        res[i] = {
-          $key: key,
-          $value: value[key]
-        }
-      }
-      this.converted = true
-      return res
-    }
-  },
-
-  /**
    * Insert an instance.
    *
    * @param {Vue} vm
@@ -666,8 +636,49 @@ module.exports = {
     return hook
       ? hook.call(vm, index, total)
       : index * this[type]
-  }
+  },
 
+  /**
+   * Pre-process the value before piping it through the
+   * filters, and convert non-Array objects to arrays.
+   *
+   * This function will be bound to this directive instance
+   * and passed into the watcher.
+   *
+   * @param {*} value
+   * @return {Array}
+   * @private
+   */
+
+  _preProcess: function (value) {
+    // regardless of type, store the un-filtered raw value.
+    this.rawValue = value
+    var type = this.rawType = typeof value
+    if (!isPlainObject(value)) {
+      this.converted = false
+      if (type === 'number') {
+        value = range(value)
+      } else if (type === 'string') {
+        value = _.toArray(value)
+      }
+      return value || []
+    } else {
+      // convert plain object to array.
+      var keys = Object.keys(value)
+      var i = keys.length
+      var res = new Array(i)
+      var key
+      while (i--) {
+        key = keys[i]
+        res[i] = {
+          $key: key,
+          $value: value[key]
+        }
+      }
+      this.converted = true
+      return res
+    }
+  }
 }
 
 /**

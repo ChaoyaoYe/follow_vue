@@ -1,4 +1,5 @@
 var _ = require('../util')
+var config = require('../config')
 var templateParser = require('../parsers/template')
 
 module.exports = {
@@ -29,7 +30,7 @@ module.exports = {
       // wait for event before insertion
       this.readyEvent = this._checkParam('wait-for')
       // check ref
-      this.refID = _.attr(this.el, 'ref')
+      this.refID = this._checkParam(config.prefix + 'ref')
       if (this.keepAlive) {
         this.cache = {}
       }
@@ -40,21 +41,19 @@ module.exports = {
       }
       // component resolution related state
       this._pendingCb =
-      this.ctorId =
-      this.Ctor = null
+      this.componentID =
+      this.Component = null
       // if static, build right now.
       if (!this._isDynamicLiteral) {
-        this.resolveCtor(this.expression, _.bind(this.initStatic, this))
+        this.resolveComponent(this.expression, _.bind(this.initStatic, this))
       } else {
         // check dynamic component params
         this.transMode = this._checkParam('transition-mode')
       }
     } else {
       process.env.NODE_ENV !== 'production' && _.warn(
-        'Do not create a component that only contains ' +
-        'a single other component - they will be mounted to ' +
-        'the same element and cause conflict. Wrap it with ' +
-        'an outer element.'
+        'cannot mount component "' + this.expression + '" ' +
+        'on already mounted element: ' + this.el
       )
     }
   },
@@ -105,7 +104,7 @@ module.exports = {
       this.remove(this.childVM, afterTransition)
       this.unsetCurrent()
     } else {
-      this.resolveCtor(value, _.bind(function () {
+      this.resolveComponent(value, _.bind(function () {
         this.unbuild(true)
         var newComponent = this.build(data)
         /* istanbul ignore if */
@@ -127,11 +126,11 @@ module.exports = {
    * the child vm.
    */
 
-  resolveCtor: function (id, cb) {
+  resolveComponent: function (id, cb) {
     var self = this
-    this._pendingCb = _.cancellable(function (ctor) {
-      self.ctorId = id
-      self.Ctor = ctor
+    this._pendingCb = _.cancellable(function (component) {
+      self.componentID = id
+      self.Component = component
       cb()
     })
     this.vm._resolveComponent(id, this._pendingCb)
@@ -161,12 +160,12 @@ module.exports = {
 
   build: function (data) {
     if (this.keepAlive) {
-      var cached = this.cache[this.ctorId]
+      var cached = this.cache[this.componentID]
       if (cached) {
         return cached
       }
     }
-    if (this.Ctor) {
+    if (this.Component) {
       var parent = this._host || this.vm
       var el = templateParser.clone(this.el)
       var child = parent.$addChild({
@@ -179,9 +178,9 @@ module.exports = {
         _asComponent: true,
         _isRouterView: this._isRouterView,
         _context: this.vm
-      }, this.Ctor)
+      }, this.Component)
       if (this.keepAlive) {
-        this.cache[this.ctorId] = child
+        this.cache[this.componentID] = child
       }
       return child
     }

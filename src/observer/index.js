@@ -17,8 +17,7 @@ require('./object')
 
 function Observer (value) {
   this.value = value
-  this.active = true
-  this.deps = []
+  this.dep = new Dep()
   _.define(value, '__ob__', this)
   if (_.isArray(value)) {
     var augment = config.proto && _.hasProto
@@ -63,16 +62,6 @@ Observer.create = function (value, vm) {
     ob.addVm(vm)
   }
   return ob
-}
-
-/**
- * Set the target watcher that is currently being evaluated.
- *
- * @param {Watcher} watcher
- */
-
-Observer.setTarget = function (watcher) {
-  Dep.target = watcher
 }
 
 // Instance methods
@@ -138,48 +127,31 @@ p.convert = function (key, val) {
   var ob = this
   var childOb = ob.observe(val)
   var dep = new Dep()
-  if (childOb) {
-    childOb.deps.push(dep)
-  }
   Object.defineProperty(ob.value, key, {
     enumerable: true,
     configurable: true,
     get: function () {
-      if (ob.active) {
+      if (Dep.target) {
         dep.depend()
+        if (childOb) {
+          childOb.dep.depend()
+        }
+        if (_.isArray(val)) {
+          for (var e, i = 0, l = val.length; i < l; i++) {
+            e = val[i]
+            e && e.__ob__ && e.__ob__.dep.depend()
+          }
+        }
       }
       return val
     },
     set: function (newVal) {
       if (newVal === val) return
-      // remove dep from old value
-      var oldChildOb = val && val.__ob__
-      if (oldChildOb) {
-        oldChildOb.deps.$remove(dep)
-      }
       val = newVal
-      // add dep to new value
-      var newChildOb = ob.observe(newVal)
-      if (newChildOb) {
-        newChildOb.deps.push(dep)
-      }
+      childOb = ob.observe(newVal)
       dep.notify()
     }
   })
-}
-
-/**
- * Notify change on all self deps on an observer.
- * This is called when a mutable value mutates. e.g.
- * when an Array's mutating methods are called, or an
- * Object's $add/$delete are called.
- */
-
-p.notify = function () {
-  var deps = this.deps
-  for (var i = 0, l = deps.length; i < l; i++) {
-    deps[i].notify()
-  }
 }
 
 /**

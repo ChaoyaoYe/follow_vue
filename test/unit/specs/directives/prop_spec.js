@@ -442,6 +442,74 @@ if (_.inBrowser) {
       })
       expect(vm.$children[0].prop).toBe(true)
       expect(vm.$el.textContent).toBe('true')
+      expect(JSON.stringify(vm.$children[0].$data)).toBe(JSON.stringify({
+        prop: true
+      }))
+    })
+
+    it('should respect default value of a Boolean prop', function () {
+      var vm = new Vue({
+        el: el,
+        template: '<test></test>',
+        components: {
+          test: {
+            props: {
+              prop: {
+                type: Boolean,
+                default: true
+              }
+            },
+            template: '{{prop}}'
+          }
+        }
+      })
+      expect(vm.$el.textContent).toBe('true')
+    })
+
+    it('should initialize with default value when not provided & has default data', function (done) {
+      var vm = new Vue({
+        el: el,
+        template: '<test></test>',
+        components: {
+          test: {
+            props: {
+              prop: {
+                type: String,
+                default: 'hello'
+              }
+            },
+            data: function () {
+              return {
+                other: 'world'
+              }
+            },
+            template: '{{prop}} {{other}}'
+          }
+        }
+      })
+      expect(vm.$el.textContent).toBe('hello world')
+      vm.$children[0].prop = 'bye'
+      _.nextTick(function () {
+        expect(vm.$el.textContent).toBe('bye world')
+        done()
+      })
+    })
+
+    it('should not warn for non-required, absent prop', function () {
+      new Vue({
+        el: el,
+        template: '<test></test>',
+        components: {
+          test: {
+            props: {
+              prop: {
+                type: String
+              }
+            }
+          }
+        }
+      })
+      expect(_.warn).not.toHaveBeenCalled()
     })
   })
 }
