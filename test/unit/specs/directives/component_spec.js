@@ -278,6 +278,23 @@ if (_.inBrowser) {
       expect(el.textContent).toBe('AAA')
     })
 
+    it('sync wait-for inside compiled hook', function () {
+      new Vue({
+        el: el,
+        template: '<view-a wait-for="ok"></view-a>',
+        components: {
+          'view-a': {
+            template: 'AAA',
+            compiled: function () {
+              expect(el.textContent).toBe('')
+              this.$emit('ok')
+            }
+          }
+        }
+      })
+      expect(el.textContent).toBe('AAA')
+    })
+
     it('wait-for for dynamic components', function (done) {
       var vm = new Vue({
         el: el,
@@ -421,6 +438,15 @@ if (_.inBrowser) {
         el: el
       })
       expect(hasWarned(_, 'cannot mount component "test" on already mounted element')).toBe(true)
+    })
+
+    it('not found component should not throw', function () {
+      expect(function () {
+        new Vue({
+          el: el,
+          template: '<div v-component="non-existent"></div>'
+        })
+      }).not.toThrow()
     })
 
   })

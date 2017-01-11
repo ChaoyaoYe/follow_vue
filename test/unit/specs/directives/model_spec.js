@@ -48,25 +48,25 @@ if (_.inBrowser) {
       var vm = new Vue({
         el: el,
         data: {
-          test: 'a'
+          test: '1'
         },
         template:
-          '<input type="radio" value="a" v-model="test" name="test">' +
-          '<input type="radio" value="b" v-model="test" name="test">'
+          '<input type="radio" value="1" v-model="test" name="test" number>' +
+          '<input type="radio" value="2" v-model="test" name="test">'
       })
       expect(el.childNodes[0].checked).toBe(true)
       expect(el.childNodes[1].checked).toBe(false)
-      vm.test = 'b'
+      vm.test = '2'
       _.nextTick(function () {
         expect(el.childNodes[0].checked).toBe(false)
         expect(el.childNodes[1].checked).toBe(true)
         el.childNodes[0].click()
         expect(el.childNodes[0].checked).toBe(true)
         expect(el.childNodes[1].checked).toBe(false)
-        expect(vm.test).toBe('a')
+        expect(vm.test).toBe(1)
         vm._directives[1].unbind()
         el.childNodes[1].click()
-        expect(vm.test).toBe('a')
+        expect(vm.test).toBe(1)
         done()
       })
     })
@@ -369,9 +369,37 @@ if (_.inBrowser) {
         template: '<select v-model="test" options="opts | aFilter"></select>'
       })
       expect(el.firstChild.innerHTML).toBe(
-          '<option value="a0">a0</option>' +
-          '<option value="b1">b1</option>'
+        '<option value="a0">a0</option>' +
+        '<option value="b1">b1</option>'
       )
+    })
+
+    it('select + options + static option', function (done) {
+      var vm = new Vue({
+        el: el,
+        data: {
+          opts: ['a', 'b']
+        },
+        template:
+          '<select v-model="test" options="opts">' +
+            '<option value="">default...</option>' +
+          '</select>'
+      })
+      expect(el.firstChild.innerHTML).toBe(
+        '<option value="">default...</option>' +
+        '<option value="a">a</option>' +
+        '<option value="b">b</option>'
+      )
+      expect(el.firstChild.options[0].selected).toBe(true)
+      vm.opts = ['c']
+      _.nextTick(function () {
+        expect(el.firstChild.innerHTML).toBe(
+          '<option value="">default...</option>' +
+          '<option value="c">c</option>'
+        )
+        expect(el.firstChild.options[0].selected).toBe(true)
+        done()
+      })
     })
 
     it('text', function (done) {

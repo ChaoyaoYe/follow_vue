@@ -137,11 +137,31 @@ if (_.inBrowser) {
       expect(c.firstChild.innerHTML).toBe('1')
     })
 
+    it('should deal with Safari template clone bug even when nested', function () {
+      var a = document.createElement('div')
+      a.innerHTML = '<template><div>1</div><template>2</template></template>'
+      var c = templateParser.clone(a)
+      expect(c.firstChild.innerHTML).toBe('<div>1</div><template>2</template>')
+    })
+
     it('should deal with IE textarea clone bug', function () {
       var t = document.createElement('textarea')
       t.placeholder = 't'
       var c = templateParser.clone(t)
       expect(c.value).toBe('')
+    })
+
+    it('should trim empty text nodes', function () {
+      // string
+      var res = templateParser.parse('    <p>test</p>    ')
+      expect(res.childNodes.length).toBe(1)
+      expect(res.firstChild.tagName).toBe('P')
+      // nodes
+      var el = document.createElement('div')
+      el.innerHTML = '<template>    <p>test</p>    </template>'
+      res = templateParser.parse(el.children[0])
+      expect(res.childNodes.length).toBe(1)
+      expect(res.firstChild.tagName).toBe('P')
     })
   })
 }

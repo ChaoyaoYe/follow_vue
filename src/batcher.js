@@ -10,8 +10,8 @@ var config = require('./config')
 var queue = []
 var userQueue = []
 var has = {}
+var circular = {}
 var waiting = false
-var flushing = false
 var internalQueueDepleted = false
 
 /**
@@ -22,15 +22,15 @@ function reset () {
   queue = []
   userQueue = []
   has = {}
-  waiting = flushing = internalQueueDepleted = false
+  circular = {}
+  waiting = internalQueueDepleted = false
 }
 
 /**
- * Flush both queues and run the jobs.
+ * Flush both queues and run the watchers.
  */
 
 function flush () {
-  flushing = true
   run(queue)
   internalQueueDepleted = true
   run(userQueue)
@@ -38,55 +38,58 @@ function flush () {
 }
 
 /**
- * Run the jobs in a single queue.
+ * Run the watchers in a single queue.
  *
  * @param {Array} queue
  */
 
 function run (queue) {
-  // do not cache length because more jobs might be pushed
-  // as we run existing jobs
+  // do not cache length because more watchers might be pushed
+  // as we run existing watchers
   for (var i = 0; i < queue.length; i++) {
-    queue[i].run()
+    var watcher = queue[i]
+    var id = watcher.id
+    has[id] = null
+    watcher.run()
+    // in dev build, check and stop circular updates.
+    if (process.env.NODE_ENV !== 'production' && has[id] != null) {
+      circular[id] = (circular[id] || 0) + 1
+      if (circular[id] > config._maxUpdateCount) {
+        queue.splice(has[id], 1)
+        _.warn(
+          'You may have an infinite update loop for watcher ' +
+          'with expression: ' + watcher.expression
+        )
+      }
+    }
   }
 }
 
 /**
- * Push a job into the job queue.
+ * Push a watcher into the watcher queue.
  * Jobs with duplicate IDs will be skipped unless it's
  * pushed when the queue is being flushed.
  *
- * @param {Object} job
+ * @param {Watcher} watcher
  *   properties:
- *   - {String|Number} id
- *   - {Function}      run
+ *   - {Number} id
+ *   - {Function} run
  */
 
-exports.push = function (job) {
-  var id = job.id
-  if (!id || !has[id] || flushing) {
-    if (!has[id]) {
-      has[id] = 1
-    } else {
-      has[id]++
-      // detect possible infinite update loops
-      if (has[id] > config._maxUpdateCount) {
-        process.env.NODE_ENV !== 'production' && _.warn(
-          'You may have an infinite update loop for the ' +
-          'watcher with expression: "' + job.expression + '".'
-        )
-        return
-      }
-    }
-    // A user watcher callback could trigger another
-    // directive update during the flushing; at that time
-    // the directive queue would already have been run, so
-    // we call that update immediately as it is pushed.
-    if (flushing && !job.user && internalQueueDepleted) {
-      job.run()
+exports.push = function (watcher) {
+  var id = watcher.id
+  if (has[id] == null) {
+    // if an internal watcher is pushed, but the internal
+    // queue is already depleted, we run it immediately.
+    if (internalQueueDepleted && !watcher.user) {
+      watcher.run()
       return
     }
-    ;(job.user ? userQueue : queue).push(job)
+    // push watcher into appropriate queue
+    var q = watcher.user ? userQueue : queue
+    has[id] = q.length
+    q.push(watcher)
+    // queue the flush
     if (!waiting) {
       waiting = true
       _.nextTick(flush)

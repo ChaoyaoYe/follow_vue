@@ -195,8 +195,8 @@ describe('Misc', function () {
       },
       watch: {
         obj: {
-            handler: spy1,
-            deep: true
+          handler: spy1,
+          deep: true
         },
         arr: spy2,
         // if the watcher is watching the added value,
@@ -290,6 +290,23 @@ describe('Misc', function () {
       })
       expect(has).toBe(true)
     }
+  })
+
+  it('handle interpolated textarea', function (done) {
+    var el = document.createElement('div')
+    el.innerHTML = '<textarea>hello {{msg}}</textarea>'
+    var vm = new Vue({
+      el: el,
+      data: {
+        msg: 'test'
+      }
+    })
+    expect(el.innerHTML).toBe('<textarea>hello test</textarea>')
+    vm.msg = 'world'
+    Vue.nextTick(function () {
+      expect(el.innerHTML).toBe('<textarea>hello world</textarea>')
+      done()
+    })
   })
 
 })
